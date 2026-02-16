@@ -41,8 +41,8 @@
         </con:representation>
         <con:request name="Get Lender Request" id="get-lender-request" mediaType="application/json">
           <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment xmlns:con="http://eviware.com/soapui/config">
-  &lt;con:entry key="Authorization" value="Bearer eyJraWQiOiJxSW5UR2EyYnJBZXNLbTBpTFJUUW1wMDA3VStmejFZV0luRVhHMkpIOHVFPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIyNW9hNXUzdnVwMmptaGwyNzBlN3NodWRrbCIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiaXFxLWFwaVwvcmVhZCBpcXEtYXBpXC93cml0ZSIsImF1dGhfdGltZSI6MTc3MTI2MTgyOSwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tXC91cy1lYXN0LTFfV2F1NXJFYjJOIiwiZXhwIjoxNzcxMjY1NDI5LCJpYXQiOjE3NzEyNjE4MjksInZlcnNpb24iOjIsImp0aSI6Ijc0MTVkMTJkLWUwZGQtNDUyYy05NjZjLWVmMWMyMTMwYTFmMyIsImNsaWVudF9pZCI6IjI1b2E1dTN2dXAyam1obDI3MGU3c2h1ZGtsIn0.Y1TcX9A_YEjh1xQlkjtLxJjfCggcPqyZLt0H99vz6bMaNJH4vsR2_hbSYApFIgyWx7vQA9cg2urDvRQ1fsgWado05Z9p67SCZjXPtNqw3_b80LQdoexjkiwAy3mcDBKvG-zZ0_XAvGJIms3ySYq40rOrL-qqcj7RZCPyaU-1_SOe34n8QdHDfzX9u2uUxNNuZ83bzw-BUNibj2CUip0RBBWqM6n_s22ro7Cj5AIcMPb5HL1UbQLXKHXl9Blq5rBicdXT6uri96DxjFJTwRZlYyvq77m-TBhRObOi7awS7zJ7K21mYRAjARE2lvCjTvjAwBVVTodVRdIVDkH3v5CmKA"/>
-  &lt;con:entry key="x-api-key" value="Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"/>
+  &lt;con:entry key="Authorization" value="Bearer ${#Project#OAUTH_TOKEN}"/>
+  &lt;con:entry key="x-api-key" value="${#Project#API_KEY}"/>
 &lt;/xml-fragment></con:setting></con:settings>
           <con:endpoint>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com</con:endpoint>
           <con:request/>
@@ -84,7 +84,7 @@
           <con:element>Response</con:element>
         </con:representation>
         <con:representation type="FAULT"><con:mediaType>application/json</con:mediaType><con:status>403</con:status><con:params/><con:element xmlns:pac="https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/package">pac:Fault</con:element></con:representation><con:request name="Get Package Request" id="get-package-request" mediaType="application/json">
-          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;entry key="Authorization" value="Bearer eyJraWQiOiJxSW5UR2EyYnJBZXNLbTBpTFJUUW1wMDA3VStmejFZV0luRVhHMkpIOHVFPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIyNW9hNXUzdnVwMmptaGwyNzBlN3NodWRrbCIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiaXFxLWFwaVwvcmVhZCBpcXEtYXBpXC93cml0ZSIsImF1dGhfdGltZSI6MTc3MTIwMTk4OCwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tXC91cy1lYXN0LTFfV2F1NXJFYjJOIiwiZXhwIjoxNzcxMjA1NTg4LCJpYXQiOjE3NzEyMDE5ODgsInZlcnNpb24iOjIsImp0aSI6IjBjMWUyNzY3LTY0NGUtNGQ4OC1iMmNkLTUxN2I3ZTZjNGFhMCIsImNsaWVudF9pZCI6IjI1b2E1dTN2dXAyam1obDI3MGU3c2h1ZGtsIn0.dLbSoVvz8Lwqss_l1ufURIfR0266xMMdYvDTR3jhRfoNE6Y2jzXKe_oyrhcuopVs2FXoR0D7WFJjrZKSj5n3zOZNQWqqaoe92llPTW-WRJlK6JkrOPUqRr5JZEro58IDB_O7Nd6__QbyWC7TI4QJE-4KKI1w5dWKKNnwPM1qmYCGsTgoc-spxtB0SCcz9xn4sD8MX5yrxXVV9UkS1z6SrDDNm1b7fzieNSu4ks8a9UdXhhQZcej4tLem55BlU2-FQyyZXCUhG61kAKFSOB6W5FYJQfjgTm9OAIw1_PuplOSxam254pz0DCxnMYHq_LfThEmp1JWd3YnX5eam1vx1Ag" xmlns="http://eviware.com/soapui/config"/></con:setting></con:settings>
+          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;entry key="Authorization" value="Bearer ${#Project#OAUTH_TOKEN}" xmlns="http://eviware.com/soapui/config"/></con:setting></con:settings>
           <con:endpoint>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com</con:endpoint>
           <con:request/>
           <con:originalUri>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/package</con:originalUri><con:credentials>
@@ -121,7 +121,7 @@
           <con:element>Response</con:element>
         </con:representation>
         <con:representation type="FAULT"><con:mediaType>application/json</con:mediaType><con:status>403</con:status><con:params/><con:element xmlns:prod="https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/product">prod:Fault</con:element></con:representation><con:request name="Get Product Request" id="get-product-request" mediaType="application/json">
-          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;entry key="Authorization" value="Bearer eyJraWQiOiJxSW5UR2EyYnJBZXNLbTBpTFJUUW1wMDA3VStmejFZV0luRVhHMkpIOHVFPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIyNW9hNXUzdnVwMmptaGwyNzBlN3NodWRrbCIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiaXFxLWFwaVwvcmVhZCBpcXEtYXBpXC93cml0ZSIsImF1dGhfdGltZSI6MTc3MTIwMTk4OCwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tXC91cy1lYXN0LTFfV2F1NXJFYjJOIiwiZXhwIjoxNzcxMjA1NTg4LCJpYXQiOjE3NzEyMDE5ODgsInZlcnNpb24iOjIsImp0aSI6IjBjMWUyNzY3LTY0NGUtNGQ4OC1iMmNkLTUxN2I3ZTZjNGFhMCIsImNsaWVudF9pZCI6IjI1b2E1dTN2dXAyam1obDI3MGU3c2h1ZGtsIn0.dLbSoVvz8Lwqss_l1ufURIfR0266xMMdYvDTR3jhRfoNE6Y2jzXKe_oyrhcuopVs2FXoR0D7WFJjrZKSj5n3zOZNQWqqaoe92llPTW-WRJlK6JkrOPUqRr5JZEro58IDB_O7Nd6__QbyWC7TI4QJE-4KKI1w5dWKKNnwPM1qmYCGsTgoc-spxtB0SCcz9xn4sD8MX5yrxXVV9UkS1z6SrDDNm1b7fzieNSu4ks8a9UdXhhQZcej4tLem55BlU2-FQyyZXCUhG61kAKFSOB6W5FYJQfjgTm9OAIw1_PuplOSxam254pz0DCxnMYHq_LfThEmp1JWd3YnX5eam1vx1Ag" xmlns="http://eviware.com/soapui/config"/></con:setting></con:settings>
+          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;entry key="Authorization" value="Bearer ${#Project#OAUTH_TOKEN}" xmlns="http://eviware.com/soapui/config"/></con:setting></con:settings>
           <con:endpoint>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com</con:endpoint>
           <con:request/>
           <con:originalUri>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/product</con:originalUri><con:credentials>
@@ -158,7 +158,7 @@
           <con:element>Response</con:element>
         </con:representation>
         <con:request name="Get Document Request" id="get-document-request" mediaType="application/json">
-          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;entry key="Authorization" value="Bearer eyJraWQiOiJxSW5UR2EyYnJBZXNLbTBpTFJUUW1wMDA3VStmejFZV0luRVhHMkpIOHVFPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIyNW9hNXUzdnVwMmptaGwyNzBlN3NodWRrbCIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiaXFxLWFwaVwvcmVhZCBpcXEtYXBpXC93cml0ZSIsImF1dGhfdGltZSI6MTc3MTIwMTk4OCwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tXC91cy1lYXN0LTFfV2F1NXJFYjJOIiwiZXhwIjoxNzcxMjA1NTg4LCJpYXQiOjE3NzEyMDE5ODgsInZlcnNpb24iOjIsImp0aSI6IjBjMWUyNzY3LTY0NGUtNGQ4OC1iMmNkLTUxN2I3ZTZjNGFhMCIsImNsaWVudF9pZCI6IjI1b2E1dTN2dXAyam1obDI3MGU3c2h1ZGtsIn0.dLbSoVvz8Lwqss_l1ufURIfR0266xMMdYvDTR3jhRfoNE6Y2jzXKe_oyrhcuopVs2FXoR0D7WFJjrZKSj5n3zOZNQWqqaoe92llPTW-WRJlK6JkrOPUqRr5JZEro58IDB_O7Nd6__QbyWC7TI4QJE-4KKI1w5dWKKNnwPM1qmYCGsTgoc-spxtB0SCcz9xn4sD8MX5yrxXVV9UkS1z6SrDDNm1b7fzieNSu4ks8a9UdXhhQZcej4tLem55BlU2-FQyyZXCUhG61kAKFSOB6W5FYJQfjgTm9OAIw1_PuplOSxam254pz0DCxnMYHq_LfThEmp1JWd3YnX5eam1vx1Ag" xmlns="http://eviware.com/soapui/config"/></con:setting></con:settings>
+          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;entry key="Authorization" value="Bearer ${#Project#OAUTH_TOKEN}" xmlns="http://eviware.com/soapui/config"/></con:setting></con:settings>
           <con:endpoint>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com</con:endpoint>
           <con:request/>
           <con:originalUri>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/document</con:originalUri><con:credentials>

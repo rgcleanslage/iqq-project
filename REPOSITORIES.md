@@ -216,7 +216,7 @@ TOKEN=$(curl -s -X POST "https://${COGNITO_DOMAIN}/oauth2/token" \
 # Test endpoints
 curl -X GET "${API_URL}/lender" \
   -H "Authorization: Bearer ${TOKEN}" \
-  -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+  -H "x-api-key: YOUR_API_KEY"
 ```
 
 ## Architecture Overview
