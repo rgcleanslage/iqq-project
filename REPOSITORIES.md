@@ -1,8 +1,24 @@
 # iQQ Platform Repositories
 
-The iQQ Insurance Quoting Platform is split into 6 separate GitHub repositories for better modularity and independent deployment.
+The iQQ Insurance Quoting Platform is split into 7 GitHub repositories for better modularity and independent deployment.
 
 ## Repository Structure
+
+### 0. iqq-project (Main Documentation)
+**Repository:** https://github.com/rgcleanslage/iqq-project  
+**Purpose:** Project-wide documentation, scripts, and architecture  
+**Contains:** 
+- Project README and overview
+- Architecture documentation
+- Deployment guides
+- Testing documentation
+- API specifications (OpenAPI)
+- Utility scripts (deployment, testing, seeding)
+- Reference materials
+
+**Deploy First:** No (documentation and scripts only)
+
+---
 
 ### 1. iqq-infrastructure
 **Repository:** https://github.com/rgcleanslage/iqq-infrastructure  
@@ -147,9 +163,12 @@ The iQQ Insurance Quoting Platform is split into 6 separate GitHub repositories 
 
 ```bash
 # Create workspace directory
-mkdir iqqplatform && cd iqqplatform
+mkdir iqq-platform && cd iqq-platform
 
-# Clone all repositories
+# Clone main documentation repository
+git clone https://github.com/rgcleanslage/iqq-project.git
+
+# Clone all service repositories
 git clone https://github.com/rgcleanslage/iqq-infrastructure.git
 git clone https://github.com/rgcleanslage/iqq-providers.git
 git clone https://github.com/rgcleanslage/iqq-lender-service.git
