@@ -1,0 +1,358 @@
+openapi: 3.0.3
+info:
+  title: iQQ Insurance Quoting Platform API
+  description: |
+    RESTful API for Client Solutions' Insurance Quoting Platform (iQQ) demonstrating modern API-driven application patterns with AWS services.
+    
+    ## Authentication
+    
+    This API uses dual authentication:
+    
+    1. **OAuth 2.0 Client Credentials Flow** - Required for all requests
+       - Obtain token from Cognito token endpoint
+       - Include in `Authorization: Bearer <token>` header
+       - Tokens expire after 1 hour
+    
+    2. **API Key** - Optional (configurable)
+       - Include in `x-api-key` header
+       - Provides rate limiting and usage tracking
+    
+    ## Rate Limiting
+    
+    - Standard Plan: 10,000 requests/month, 50 requests/second
+    - Premium Plan: 100,000 requests/month, 200 requests/second
+    
+    ## Correlation IDs
+    
+    All responses include an `X-Correlation-ID` header for request tracing and debugging.
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@example.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: 'https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev'
+    description: Development environment
+
+tags:
+  - name: Lender
+    description: Lender information and management
+  - name: Package
+    description: Insurance package bundles
+  - name: Product
+    description: Individual insurance products
+  - name: Document
+    description: Insurance documents and policies
+
+paths:
+  /lender:
+    get:
+      tags:
+        - Lender
+      summary: Get lender information
+      description: Retrieves detailed information about an insurance lender including contact details, products offered, and ratings.
+      operationId: getLender
+      parameters:
+        - name: lenderId
+          in: query
+          description: Unique identifier for the lender
+          required: false
+          schema:
+            type: string
+            example: LENDER-123
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-Correlation-ID:
+              description: Unique request identifier for tracing
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lenderId:
+                    type: string
+                    example: LENDER-001
+                  lenderName:
+                    type: string
+                    example: Premium Auto Finance
+                  lenderType:
+                    type: string
+                    example: Captive
+                  contactInfo:
+                    type: object
+                    properties:
+                      phone:
+                        type: string
+                        example: 1-800-555-0100
+                      email:
+                        type: string
+                        example: quotes@premiumautofinance.com
+                      website:
+                        type: string
+                        example: https://www.premiumautofinance.com
+                  productsOffered:
+                    type: array
+                    items:
+                      type: string
+                    example: [MBP, GAP, Vehicle Depreciation Protection]
+                  ratingInfo:
+                    type: object
+                    properties:
+                      creditRating:
+                        type: string
+                        example: A+
+                      yearsInBusiness:
+                        type: integer
+                        example: 25
+                      customerSatisfactionScore:
+                        type: number
+                        example: 4.7
+                  metadata:
+                    type: object
+                    properties:
+                      timestamp:
+                        type: string
+                        example: 2024-02-16T14:22:00Z
+                      version:
+                        type: string
+                        example: 1.0.0
+                      correlationId:
+                        type: string
+                        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Unauthorized
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Forbidden
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal Server Error
+                  message:
+                    type: string
+                    example: Failed to process lender request
+                  correlationId:
+                    type: string
+      security:
+        - OAuth2: []
+        - ApiKey: []
+
+  /package:
+    get:
+      tags:
+        - Package
+      summary: Get insurance package
+      description: Retrieves an insurance package bundle containing multiple products with pricing information.
+      operationId: getPackage
+      parameters:
+        - name: packageId
+          in: query
+          description: Unique identifier for the package
+          required: false
+          schema:
+            type: string
+            example: PKG-456
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packageId:
+                    type: string
+                    example: PKG-001
+                  packageName:
+                    type: string
+                    example: Premium Protection Bundle
+                  packageType:
+                    type: string
+                    example: Premium
+                  products:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        productId:
+                          type: string
+                        productName:
+                          type: string
+                        productType:
+                          type: string
+                        coverage:
+                          type: string
+                        premium:
+                          type: number
+                  pricing:
+                    type: object
+                    properties:
+                      basePrice:
+                        type: number
+                      discountPercentage:
+                        type: number
+                      totalPrice:
+                        type: number
+                      currency:
+                        type: string
+                  metadata:
+                    type: object
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '500':
+          description: Internal Server Error
+      security:
+        - OAuth2: []
+        - ApiKey: []
+
+  /product:
+    get:
+      tags:
+        - Product
+      summary: Get product information
+      description: Retrieves detailed information about an insurance product including coverage details, pricing, and available providers.
+      operationId: getProduct
+      parameters:
+        - name: productId
+          in: query
+          description: Unique identifier for the product
+          required: false
+          schema:
+            type: string
+            example: PROD-789
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  productId:
+                    type: string
+                  productName:
+                    type: string
+                  productType:
+                    type: string
+                  description:
+                    type: string
+                  coverage:
+                    type: object
+                  pricing:
+                    type: object
+                  providers:
+                    type: array
+                    items:
+                      type: object
+                  metadata:
+                    type: object
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '500':
+          description: Internal Server Error
+      security:
+        - OAuth2: []
+        - ApiKey: []
+
+  /document:
+    get:
+      tags:
+        - Document
+      summary: Get document information
+      description: Retrieves metadata and access information for an insurance document.
+      operationId: getDocument
+      parameters:
+        - name: documentId
+          in: query
+          description: Unique identifier for the document
+          required: false
+          schema:
+            type: string
+            example: DOC-101
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documentId:
+                    type: string
+                  documentName:
+                    type: string
+                  documentType:
+                    type: string
+                  status:
+                    type: string
+                  content:
+                    type: object
+                  metadata:
+                    type: object
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '500':
+          description: Internal Server Error
+      security:
+        - OAuth2: []
+        - ApiKey: []
+
+components:
+  securitySchemes:
+    OAuth2:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OAuth 2.0 Bearer token from AWS Cognito
+    
+    ApiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key for rate limiting and usage tracking

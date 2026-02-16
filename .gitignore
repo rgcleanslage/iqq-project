@@ -1,0 +1,43 @@
+# Root-level gitignore for monorepo
+# Individual repositories will have their own .gitignore files
+
+# Individual repositories (they have their own git repos)
+iqq-infrastructure/
+iqq-providers/
+iqq-lender-service/
+iqq-package-service/
+iqq-product-service/
+iqq-document-service/
+
+# Node modules
+node_modules/
+scripts/node_modules/
+**/node_modules/
+
+# OAuth tokens and secrets
+.oauth-token.txt
+*.pem
+*.key
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp

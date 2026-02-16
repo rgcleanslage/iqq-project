@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:soapui-project id="iQQ-Insurance-API" name="iQQ Insurance API" resourceRoot="" soapui-version="5.9.1" abortOnError="false" runType="SEQUENTIAL" activeEnvironment="Default" xmlns:con="http://eviware.com/soapui/config">
+  
+  <con:settings/>
+  
+  <con:interface xsi:type="con:RestService" id="iQQ-API-Interface" wadlVersion="http://wadl.dev.java.net/2009/02" name="iQQ API" type="rest" basePath="/dev" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    
+    <con:settings/>
+    <con:definitionCache type="TEXT" rootPart=""/>
+    
+    <con:endpoints>
+      <con:endpoint>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com</con:endpoint>
+    </con:endpoints>
+    
+    <!-- Lender Resource -->
+    <con:resource name="Lender" path="/lender" id="lender-resource">
+      <con:settings/>
+      <con:parameters>
+        <con:parameter required="true">
+          <con:name>lenderId</con:name>
+          <con:value>LENDER-123</con:value>
+          <con:style>QUERY</con:style>
+          <con:default>LENDER-123</con:default>
+        </con:parameter>
+      </con:parameters>
+      
+      <con:method name="GET Lender" id="get-lender-method" method="GET">
+        <con:settings/>
+        <con:parameters/>
+        <con:representation type="RESPONSE">
+          <con:mediaType>application/json</con:mediaType>
+          <con:status>200</con:status>
+          <con:params/>
+          <con:element>Response</con:element>
+        </con:representation>
+        <con:representation type="FAULT">
+          <con:mediaType>application/json</con:mediaType>
+          <con:status>401 403</con:status>
+          <con:params/>
+          <con:element>Fault</con:element>
+        </con:representation>
+        <con:request name="Get Lender Request" id="get-lender-request" mediaType="application/json">
+          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment xmlns:con="http://eviware.com/soapui/config">
+  &lt;con:entry key="Authorization" value="Bearer eyJraWQiOiJxSW5UR2EyYnJBZXNLbTBpTFJUUW1wMDA3VStmejFZV0luRVhHMkpIOHVFPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIyNW9hNXUzdnVwMmptaGwyNzBlN3NodWRrbCIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiaXFxLWFwaVwvcmVhZCBpcXEtYXBpXC93cml0ZSIsImF1dGhfdGltZSI6MTc3MTI2MTgyOSwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tXC91cy1lYXN0LTFfV2F1NXJFYjJOIiwiZXhwIjoxNzcxMjY1NDI5LCJpYXQiOjE3NzEyNjE4MjksInZlcnNpb24iOjIsImp0aSI6Ijc0MTVkMTJkLWUwZGQtNDUyYy05NjZjLWVmMWMyMTMwYTFmMyIsImNsaWVudF9pZCI6IjI1b2E1dTN2dXAyam1obDI3MGU3c2h1ZGtsIn0.Y1TcX9A_YEjh1xQlkjtLxJjfCggcPqyZLt0H99vz6bMaNJH4vsR2_hbSYApFIgyWx7vQA9cg2urDvRQ1fsgWado05Z9p67SCZjXPtNqw3_b80LQdoexjkiwAy3mcDBKvG-zZ0_XAvGJIms3ySYq40rOrL-qqcj7RZCPyaU-1_SOe34n8QdHDfzX9u2uUxNNuZ83bzw-BUNibj2CUip0RBBWqM6n_s22ro7Cj5AIcMPb5HL1UbQLXKHXl9Blq5rBicdXT6uri96DxjFJTwRZlYyvq77m-TBhRObOi7awS7zJ7K21mYRAjARE2lvCjTvjAwBVVTodVRdIVDkH3v5CmKA"/>
+  &lt;con:entry key="x-api-key" value="Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"/>
+&lt;/xml-fragment></con:setting></con:settings>
+          <con:endpoint>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com</con:endpoint>
+          <con:request/>
+          <con:originalUri>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/lender</con:originalUri><con:credentials>
+            <con:selectedAuthProfile>No Authorization</con:selectedAuthProfile>
+            <con:addedBasicAuthenticationTypes>Basic</con:addedBasicAuthenticationTypes>
+            <con:authType>No Authorization</con:authType>
+          </con:credentials>
+          <con:jmsConfig JMSDeliveryMode="PERSISTENT"/>
+          <con:jmsPropertyConfig/><con:parameters>
+            <con:entry key="lenderId" value="LENDER-123"/>
+          </con:parameters>
+          <con:parameterOrder>
+            <con:entry>lenderId</con:entry>
+          </con:parameterOrder>
+        </con:request>
+      </con:method>
+    </con:resource>
+    
+    <!-- Package Resource -->
+    <con:resource name="Package" path="/package" id="package-resource">
+      <con:settings/>
+      <con:parameters>
+        <con:parameter required="true">
+          <con:name>packageId</con:name>
+          <con:value>PKG-456</con:value>
+          <con:style>QUERY</con:style>
+          <con:default>PKG-456</con:default>
+        </con:parameter>
+      </con:parameters>
+      
+      <con:method name="GET Package" id="get-package-method" method="GET">
+        <con:settings/>
+        <con:parameters/>
+        <con:representation type="RESPONSE">
+          <con:mediaType>application/json</con:mediaType>
+          <con:status>200</con:status>
+          <con:params/>
+          <con:element>Response</con:element>
+        </con:representation>
+        <con:representation type="FAULT"><con:mediaType>application/json</con:mediaType><con:status>403</con:status><con:params/><con:element xmlns:pac="https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/package">pac:Fault</con:element></con:representation><con:request name="Get Package Request" id="get-package-request" mediaType="application/json">
+          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;entry key="Authorization" value="Bearer eyJraWQiOiJxSW5UR2EyYnJBZXNLbTBpTFJUUW1wMDA3VStmejFZV0luRVhHMkpIOHVFPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIyNW9hNXUzdnVwMmptaGwyNzBlN3NodWRrbCIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiaXFxLWFwaVwvcmVhZCBpcXEtYXBpXC93cml0ZSIsImF1dGhfdGltZSI6MTc3MTIwMTk4OCwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tXC91cy1lYXN0LTFfV2F1NXJFYjJOIiwiZXhwIjoxNzcxMjA1NTg4LCJpYXQiOjE3NzEyMDE5ODgsInZlcnNpb24iOjIsImp0aSI6IjBjMWUyNzY3LTY0NGUtNGQ4OC1iMmNkLTUxN2I3ZTZjNGFhMCIsImNsaWVudF9pZCI6IjI1b2E1dTN2dXAyam1obDI3MGU3c2h1ZGtsIn0.dLbSoVvz8Lwqss_l1ufURIfR0266xMMdYvDTR3jhRfoNE6Y2jzXKe_oyrhcuopVs2FXoR0D7WFJjrZKSj5n3zOZNQWqqaoe92llPTW-WRJlK6JkrOPUqRr5JZEro58IDB_O7Nd6__QbyWC7TI4QJE-4KKI1w5dWKKNnwPM1qmYCGsTgoc-spxtB0SCcz9xn4sD8MX5yrxXVV9UkS1z6SrDDNm1b7fzieNSu4ks8a9UdXhhQZcej4tLem55BlU2-FQyyZXCUhG61kAKFSOB6W5FYJQfjgTm9OAIw1_PuplOSxam254pz0DCxnMYHq_LfThEmp1JWd3YnX5eam1vx1Ag" xmlns="http://eviware.com/soapui/config"/></con:setting></con:settings>
+          <con:endpoint>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com</con:endpoint>
+          <con:request/>
+          <con:originalUri>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/package</con:originalUri><con:credentials>
+            <con:selectedAuthProfile>No Authorization</con:selectedAuthProfile>
+            <con:authType>No Authorization</con:authType>
+          </con:credentials>
+          <con:jmsConfig JMSDeliveryMode="PERSISTENT"/>
+          <con:jmsPropertyConfig/><con:parameters>
+            <con:entry key="packageId" value="PKG-456"/>
+          </con:parameters>
+        </con:request>
+      </con:method>
+    </con:resource>
+    
+    <!-- Product Resource -->
+    <con:resource name="Product" path="/product" id="product-resource">
+      <con:settings/>
+      <con:parameters>
+        <con:parameter required="true">
+          <con:name>productId</con:name>
+          <con:value>PROD-789</con:value>
+          <con:style>QUERY</con:style>
+          <con:default>PROD-789</con:default>
+        </con:parameter>
+      </con:parameters>
+      
+      <con:method name="GET Product" id="get-product-method" method="GET">
+        <con:settings/>
+        <con:parameters/>
+        <con:representation type="RESPONSE">
+          <con:mediaType>application/json</con:mediaType>
+          <con:status>200</con:status>
+          <con:params/>
+          <con:element>Response</con:element>
+        </con:representation>
+        <con:representation type="FAULT"><con:mediaType>application/json</con:mediaType><con:status>403</con:status><con:params/><con:element xmlns:prod="https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/product">prod:Fault</con:element></con:representation><con:request name="Get Product Request" id="get-product-request" mediaType="application/json">
+          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;entry key="Authorization" value="Bearer eyJraWQiOiJxSW5UR2EyYnJBZXNLbTBpTFJUUW1wMDA3VStmejFZV0luRVhHMkpIOHVFPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIyNW9hNXUzdnVwMmptaGwyNzBlN3NodWRrbCIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiaXFxLWFwaVwvcmVhZCBpcXEtYXBpXC93cml0ZSIsImF1dGhfdGltZSI6MTc3MTIwMTk4OCwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tXC91cy1lYXN0LTFfV2F1NXJFYjJOIiwiZXhwIjoxNzcxMjA1NTg4LCJpYXQiOjE3NzEyMDE5ODgsInZlcnNpb24iOjIsImp0aSI6IjBjMWUyNzY3LTY0NGUtNGQ4OC1iMmNkLTUxN2I3ZTZjNGFhMCIsImNsaWVudF9pZCI6IjI1b2E1dTN2dXAyam1obDI3MGU3c2h1ZGtsIn0.dLbSoVvz8Lwqss_l1ufURIfR0266xMMdYvDTR3jhRfoNE6Y2jzXKe_oyrhcuopVs2FXoR0D7WFJjrZKSj5n3zOZNQWqqaoe92llPTW-WRJlK6JkrOPUqRr5JZEro58IDB_O7Nd6__QbyWC7TI4QJE-4KKI1w5dWKKNnwPM1qmYCGsTgoc-spxtB0SCcz9xn4sD8MX5yrxXVV9UkS1z6SrDDNm1b7fzieNSu4ks8a9UdXhhQZcej4tLem55BlU2-FQyyZXCUhG61kAKFSOB6W5FYJQfjgTm9OAIw1_PuplOSxam254pz0DCxnMYHq_LfThEmp1JWd3YnX5eam1vx1Ag" xmlns="http://eviware.com/soapui/config"/></con:setting></con:settings>
+          <con:endpoint>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com</con:endpoint>
+          <con:request/>
+          <con:originalUri>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/product</con:originalUri><con:credentials>
+            <con:selectedAuthProfile>No Authorization</con:selectedAuthProfile>
+            <con:authType>No Authorization</con:authType>
+          </con:credentials>
+          <con:jmsConfig JMSDeliveryMode="PERSISTENT"/>
+          <con:jmsPropertyConfig/><con:parameters>
+            <con:entry key="productId" value="PROD-789"/>
+          </con:parameters>
+        </con:request>
+      </con:method>
+    </con:resource>
+    
+    <!-- Document Resource -->
+    <con:resource name="Document" path="/document" id="document-resource">
+      <con:settings/>
+      <con:parameters>
+        <con:parameter required="true">
+          <con:name>documentId</con:name>
+          <con:value>DOC-101</con:value>
+          <con:style>QUERY</con:style>
+          <con:default>DOC-101</con:default>
+        </con:parameter>
+      </con:parameters>
+      
+      <con:method name="GET Document" id="get-document-method" method="GET">
+        <con:settings/>
+        <con:parameters/>
+        <con:representation type="RESPONSE">
+          <con:mediaType>application/json</con:mediaType>
+          <con:status>200</con:status>
+          <con:params/>
+          <con:element>Response</con:element>
+        </con:representation>
+        <con:request name="Get Document Request" id="get-document-request" mediaType="application/json">
+          <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;entry key="Authorization" value="Bearer eyJraWQiOiJxSW5UR2EyYnJBZXNLbTBpTFJUUW1wMDA3VStmejFZV0luRVhHMkpIOHVFPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiIyNW9hNXUzdnVwMmptaGwyNzBlN3NodWRrbCIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiaXFxLWFwaVwvcmVhZCBpcXEtYXBpXC93cml0ZSIsImF1dGhfdGltZSI6MTc3MTIwMTk4OCwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tXC91cy1lYXN0LTFfV2F1NXJFYjJOIiwiZXhwIjoxNzcxMjA1NTg4LCJpYXQiOjE3NzEyMDE5ODgsInZlcnNpb24iOjIsImp0aSI6IjBjMWUyNzY3LTY0NGUtNGQ4OC1iMmNkLTUxN2I3ZTZjNGFhMCIsImNsaWVudF9pZCI6IjI1b2E1dTN2dXAyam1obDI3MGU3c2h1ZGtsIn0.dLbSoVvz8Lwqss_l1ufURIfR0266xMMdYvDTR3jhRfoNE6Y2jzXKe_oyrhcuopVs2FXoR0D7WFJjrZKSj5n3zOZNQWqqaoe92llPTW-WRJlK6JkrOPUqRr5JZEro58IDB_O7Nd6__QbyWC7TI4QJE-4KKI1w5dWKKNnwPM1qmYCGsTgoc-spxtB0SCcz9xn4sD8MX5yrxXVV9UkS1z6SrDDNm1b7fzieNSu4ks8a9UdXhhQZcej4tLem55BlU2-FQyyZXCUhG61kAKFSOB6W5FYJQfjgTm9OAIw1_PuplOSxam254pz0DCxnMYHq_LfThEmp1JWd3YnX5eam1vx1Ag" xmlns="http://eviware.com/soapui/config"/></con:setting></con:settings>
+          <con:endpoint>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com</con:endpoint>
+          <con:request/>
+          <con:originalUri>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/document</con:originalUri><con:credentials>
+            <con:selectedAuthProfile>No Authorization</con:selectedAuthProfile>
+            <con:authType>No Authorization</con:authType>
+          </con:credentials>
+          <con:jmsConfig JMSDeliveryMode="PERSISTENT"/>
+          <con:jmsPropertyConfig/><con:parameters>
+            <con:entry key="documentId" value="DOC-101"/>
+          </con:parameters>
+        </con:request>
+      </con:method>
+    </con:resource>
+    
+  </con:interface>
+  
+  <con:properties>
+    <con:property>
+      <con:name>API_BASE_URL</con:name>
+      <con:value>https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev</con:value>
+    </con:property>
+    <con:property>
+      <con:name>COGNITO_TOKEN_URL</con:name>
+      <con:value>https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token</con:value>
+    </con:property>
+    <con:property>
+      <con:name>CLIENT_ID</con:name>
+      <con:value>${#Project#CLIENT_ID}</con:value>
+    </con:property>
+    <con:property>
+      <con:name>CLIENT_SECRET</con:name>
+      <con:value>${#Project#CLIENT_SECRET}</con:value>
+    </con:property>
+    <con:property>
+      <con:name>OAUTH_SCOPES</con:name>
+      <con:value>iqq-api/read iqq-api/write</con:value>
+    </con:property>
+  </con:properties>
+  
+  <con:wssContainer/>
+  <con:oAuth2ProfileContainer/>
+  <con:oAuth1ProfileContainer/>
+  <con:sensitiveInformation/>
+  
+</con:soapui-project>

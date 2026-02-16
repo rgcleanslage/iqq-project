@@ -1,0 +1,700 @@
+openapi: 3.0.3
+info:
+  title: iQQ Insurance Quoting Platform API
+  description: |
+    RESTful API for Client Solutions' Insurance Quoting Platform (iQQ) demonstrating modern API-driven application patterns with AWS services.
+    
+    ## Authentication
+    
+    This API uses dual authentication:
+    
+    1. **OAuth 2.0 Client Credentials Flow** - Required for all requests
+       - Obtain token from Cognito token endpoint
+       - Include in `Authorization: Bearer <token>` header
+       - Tokens expire after 1 hour
+    
+    2. **API Key** - Optional (configurable)
+       - Include in `x-api-key` header
+       - Provides rate limiting and usage tracking
+    
+    ## Rate Limiting
+    
+    - Standard Plan: 10,000 requests/month, 50 requests/second
+    - Premium Plan: 100,000 requests/month, 200 requests/second
+    
+    ## Correlation IDs
+    
+    All responses include an `X-Correlation-ID` header for request tracing and debugging.
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@example.com
+  license:
+    name: Proprietary
+    
+servers:
+  - url: https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev
+    description: Development environment
+    variables:
+      basePath:
+        default: ''
+  - url: https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/test
+    description: Test environment
+    variables:
+      basePath:
+        default: ''
+  - url: https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/prod
+    description: Production environment
+    variables:
+      basePath:
+        default: ''
+
+tags:
+  - name: Lender
+    description: Lender information and management
+  - name: Package
+    description: Insurance package bundles
+  - name: Product
+    description: Individual insurance products
+  - name: Document
+    description: Insurance documents and policies
+  - name: Authentication
+    description: OAuth 2.0 token management
+
+paths:
+  /lender:
+    get:
+      tags:
+        - Lender
+      summary: Get lender information
+      description: Retrieves detailed information about an insurance lender including contact details, products offered, and ratings.
+      operationId: getLender
+      parameters:
+        - name: lenderId
+          in: query
+          description: Unique identifier for the lender
+          required: false
+          schema:
+            type: string
+            example: LENDER-123
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-Correlation-ID:
+              description: Unique request identifier for tracing
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LenderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - OAuth2: [iqq-api/read]
+        - ApiKey: []
+
+  /package:
+    get:
+      tags:
+        - Package
+      summary: Get insurance package
+      description: Retrieves an insurance package bundle containing multiple products with pricing information.
+      operationId: getPackage
+      parameters:
+        - name: packageId
+          in: query
+          description: Unique identifier for the package
+          required: false
+          schema:
+            type: string
+            example: PKG-456
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-Correlation-ID:
+              description: Unique request identifier for tracing
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - OAuth2: [iqq-api/read]
+        - ApiKey: []
+
+  /product:
+    get:
+      tags:
+        - Product
+      summary: Get product information
+      description: Retrieves detailed information about an insurance product including coverage details, pricing, and available providers.
+      operationId: getProduct
+      parameters:
+        - name: productId
+          in: query
+          description: Unique identifier for the product
+          required: false
+          schema:
+            type: string
+            example: PROD-789
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-Correlation-ID:
+              description: Unique request identifier for tracing
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - OAuth2: [iqq-api/read]
+        - ApiKey: []
+
+  /document:
+    get:
+      tags:
+        - Document
+      summary: Get document information
+      description: Retrieves metadata and access information for an insurance document.
+      operationId: getDocument
+      parameters:
+        - name: documentId
+          in: query
+          description: Unique identifier for the document
+          required: false
+          schema:
+            type: string
+            example: DOC-101
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            X-Correlation-ID:
+              description: Unique request identifier for tracing
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+      security:
+        - OAuth2: [iqq-api/read]
+        - ApiKey: []
+
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: OAuth 2.0 client credentials flow via AWS Cognito
+      flows:
+        clientCredentials:
+          tokenUrl: https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token
+          scopes:
+            iqq-api/read: Read access to API resources
+            iqq-api/write: Write access to API resources
+    
+    ApiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key for rate limiting and usage tracking
+
+  schemas:
+    LenderResponse:
+      type: object
+      required:
+        - lenderId
+        - lenderName
+        - lenderType
+        - contactInfo
+        - productsOffered
+        - ratingInfo
+        - metadata
+      properties:
+        lenderId:
+          type: string
+          description: Unique identifier for the lender
+          example: LENDER-001
+        lenderName:
+          type: string
+          description: Name of the lending institution
+          example: Premium Auto Finance
+        lenderType:
+          type: string
+          description: Type of lender
+          enum: [Captive, Bank, Credit Union, Finance Company]
+          example: Captive
+        contactInfo:
+          type: object
+          required:
+            - phone
+            - email
+            - website
+          properties:
+            phone:
+              type: string
+              example: 1-800-555-0100
+            email:
+              type: string
+              format: email
+              example: quotes@premiumautofinance.com
+            website:
+              type: string
+              format: uri
+              example: https://www.premiumautofinance.com
+        productsOffered:
+          type: array
+          description: List of insurance products offered by this lender
+          items:
+            type: string
+          example: [MBP, GAP, Vehicle Depreciation Protection]
+        ratingInfo:
+          type: object
+          required:
+            - creditRating
+            - yearsInBusiness
+            - customerSatisfactionScore
+          properties:
+            creditRating:
+              type: string
+              example: A+
+            yearsInBusiness:
+              type: integer
+              example: 25
+            customerSatisfactionScore:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 5
+              example: 4.7
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+
+    PackageResponse:
+      type: object
+      required:
+        - packageId
+        - packageName
+        - packageType
+        - products
+        - pricing
+        - metadata
+      properties:
+        packageId:
+          type: string
+          description: Unique identifier for the package
+          example: PKG-001
+        packageName:
+          type: string
+          description: Name of the insurance package
+          example: Premium Protection Bundle
+        packageType:
+          type: string
+          description: Type/tier of the package
+          enum: [Basic, Standard, Premium, Ultimate]
+          example: Premium
+        products:
+          type: array
+          description: List of products included in this package
+          items:
+            type: object
+            required:
+              - productId
+              - productName
+              - productType
+              - coverage
+              - premium
+            properties:
+              productId:
+                type: string
+                example: PROD-MBP-001
+              productName:
+                type: string
+                example: Mechanical Breakdown Protection
+              productType:
+                type: string
+                example: MBP
+              coverage:
+                type: string
+                example: Comprehensive powertrain and component coverage
+              premium:
+                type: number
+                format: float
+                example: 1299.99
+        pricing:
+          type: object
+          required:
+            - basePrice
+            - totalPrice
+            - currency
+          properties:
+            basePrice:
+              type: number
+              format: float
+              description: Sum of all product premiums
+              example: 2299.97
+            discountPercentage:
+              type: number
+              format: float
+              description: Discount applied to bundle
+              example: 10
+            totalPrice:
+              type: number
+              format: float
+              description: Final price after discounts
+              example: 2069.97
+            currency:
+              type: string
+              example: USD
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+
+    ProductResponse:
+      type: object
+      required:
+        - productId
+        - productName
+        - productType
+        - description
+        - coverage
+        - pricing
+        - providers
+        - metadata
+      properties:
+        productId:
+          type: string
+          description: Unique identifier for the product
+          example: PROD-001
+        productName:
+          type: string
+          description: Name of the insurance product
+          example: Mechanical Breakdown Protection
+        productType:
+          type: string
+          description: Type of insurance product
+          enum: [MBP, GAP, Vehicle Depreciation Protection, Tire and Wheel, Key Replacement]
+          example: MBP
+        description:
+          type: string
+          description: Detailed product description
+          example: Comprehensive coverage for mechanical and electrical failures after manufacturer warranty expires
+        coverage:
+          type: object
+          required:
+            - coverageType
+            - coverageLimit
+            - deductible
+            - term
+          properties:
+            coverageType:
+              type: string
+              enum: [Comprehensive, Powertrain, Named Component]
+              example: Comprehensive
+            coverageLimit:
+              type: number
+              description: Maximum coverage amount
+              example: 100000
+            deductible:
+              type: number
+              description: Deductible amount per claim
+              example: 100
+            term:
+              type: string
+              description: Coverage term duration
+              example: 60 months / 60,000 miles
+            exclusions:
+              type: array
+              description: List of coverage exclusions
+              items:
+                type: string
+              example: [Pre-existing conditions, Wear and tear items, Maintenance services]
+        pricing:
+          type: object
+          required:
+            - basePremium
+            - totalPremium
+            - currency
+          properties:
+            basePremium:
+              type: number
+              format: float
+              example: 1199.99
+            adminFee:
+              type: number
+              format: float
+              example: 50.00
+            taxRate:
+              type: number
+              format: float
+              example: 0.06
+            totalPremium:
+              type: number
+              format: float
+              example: 1324.99
+            currency:
+              type: string
+              example: USD
+        providers:
+          type: array
+          description: List of providers offering this product
+          items:
+            type: object
+            required:
+              - providerId
+              - providerName
+              - rating
+              - available
+            properties:
+              providerId:
+                type: string
+                example: PROV-CLIENT
+              providerName:
+                type: string
+                example: Client Insurance
+              rating:
+                type: string
+                example: A+
+              available:
+                type: boolean
+                example: true
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+
+    DocumentResponse:
+      type: object
+      required:
+        - documentId
+        - documentName
+        - documentType
+        - status
+        - content
+        - metadata
+      properties:
+        documentId:
+          type: string
+          description: Unique identifier for the document
+          example: DOC-001
+        documentName:
+          type: string
+          description: Name of the document
+          example: Insurance Policy Document
+        documentType:
+          type: string
+          description: Type of document
+          enum: [Policy, Quote, Certificate, Claim, Amendment]
+          example: Policy
+        status:
+          type: string
+          description: Current status of the document
+          enum: [Draft, Issued, Active, Expired, Cancelled]
+          example: Issued
+        content:
+          type: object
+          required:
+            - format
+            - size
+            - url
+          properties:
+            format:
+              type: string
+              description: Document file format
+              enum: [PDF, DOCX, HTML]
+              example: PDF
+            size:
+              type: integer
+              description: File size in bytes
+              example: 245678
+            url:
+              type: string
+              format: uri
+              description: Pre-signed URL to download document
+              example: https://s3.amazonaws.com/iqq-documents/policy-doc-001.pdf
+            checksum:
+              type: string
+              description: SHA-256 checksum for file integrity
+              example: a3f5c8b9e2d1f4a6c7b8e9d0f1a2b3c4
+        metadata:
+          allOf:
+            - $ref: '#/components/schemas/Metadata'
+            - type: object
+              properties:
+                createdAt:
+                  type: string
+                  format: date-time
+                  example: 2024-01-15T10:30:00Z
+                updatedAt:
+                  type: string
+                  format: date-time
+                  example: 2024-02-16T14:22:00Z
+                createdBy:
+                  type: string
+                  example: system
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  example: [policy, auto-insurance, mbp, active]
+
+    Metadata:
+      type: object
+      required:
+        - timestamp
+        - version
+        - correlationId
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Response generation timestamp
+          example: 2024-02-16T14:22:00Z
+        version:
+          type: string
+          description: API version
+          example: 1.0.0
+        correlationId:
+          type: string
+          description: Unique request identifier for tracing
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - correlationId
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: Internal Server Error
+        message:
+          type: string
+          description: Human-readable error message
+          example: Failed to process request
+        correlationId:
+          type: string
+          description: Request correlation ID for debugging
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        details:
+          type: object
+          description: Additional error details (optional)
+          additionalProperties: true
+
+  responses:
+    Unauthorized:
+      description: Authentication required or token invalid/expired
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Unauthorized
+          examples:
+            missingToken:
+              summary: Missing authorization token
+              value:
+                message: Unauthorized
+            expiredToken:
+              summary: Expired token
+              value:
+                message: Token has expired
+    
+    Forbidden:
+      description: Insufficient permissions or invalid API key
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Forbidden
+          examples:
+            missingApiKey:
+              summary: Missing API key (when required)
+              value:
+                message: Forbidden
+            invalidApiKey:
+              summary: Invalid API key
+              value:
+                message: Forbidden
+    
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit per time window
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Remaining requests in current window
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: Time when rate limit resets (Unix timestamp)
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: Too Many Requests
+    
+    InternalServerError:
+      description: Internal server error
+      headers:
+        X-Correlation-ID:
+          description: Request correlation ID for debugging
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+security:
+  - OAuth2: [iqq-api/read]
+  - ApiKey: []
