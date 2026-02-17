@@ -1,341 +1,337 @@
-# HTTP Provider Migration Guide
+# Migration from Custom Lambda Authorizer to Cognito Authorizer
 
 ## Overview
 
-This guide documents the migration from direct Lambda invocation (using Lambda ARNs) to HTTP-based invocation (using Lambda Function URLs) for provider services.
+This document describes the migration from a custom Lambda authorizer to AWS API Gateway's native Cognito authorizer with built-in API key support.
 
-## Why HTTP Instead of Direct Lambda Invocation?
+## Why Migrate?
 
-1. **Production-Ready Architecture**: HTTP invocation mirrors real-world scenarios where providers are external services accessed via HTTP/HTTPS
-2. **Better Isolation**: Function URLs provide a clear API boundary between Step Functions and providers
-3. **Easier Testing**: HTTP endpoints can be tested with standard HTTP tools (curl, Postman, SoapUI)
-4. **Flexibility**: Easier to swap Lambda implementations with external HTTP services in the future
-5. **Monitoring**: HTTP-level metrics and logging for better observability
+### Problems with Custom Lambda Authorizer:
+1. **Unnecessary complexity** - Custom code to validate JWT tokens that Cognito can do natively
+2. **Higher latency** - Lambda cold starts add 100-500ms to every request
+3. **Higher costs** - Pay for Lambda invocations on every API call
+4. **Maintenance burden** - Need to maintain authorizer code, tests, and deployments
+5. **Duplicate functionality** - API Gateway already has native API key support
 
-## Architecture Changes
+### Benefits of Cognito Authorizer:
+1. **Zero latency** - No Lambda invocation, validation happens in API Gateway
+2. **Lower cost** - No Lambda charges for authorization
+3. **Less code** - Remove entire authorizer Lambda function
+4. **Native features** - Use API Gateway's built-in API key management, usage plans, and throttling
+5. **Better caching** - 5-minute authorization cache (vs 0 seconds with custom authorizer)
 
-### Before (Lambda ARN Invocation)
+## What Changed
+
+### Before:
 ```
-Step Functions → Lambda Invoke (arn:aws:lambda:...) → Provider Lambda
+Client Request
+    ↓
+API Gateway
+    ↓
+Custom Lambda Authorizer (validates OAuth + API key from DynamoDB)
+    ↓
+Backend Lambda
 ```
 
-### After (HTTP URL Invocation)
+### After:
 ```
-Step Functions → HTTP POST (https://...lambda-url.on.aws/) → Provider Lambda
+Client Request
+    ↓
+API Gateway (validates OAuth via Cognito + API key natively)
+    ↓
+Backend Lambda
 ```
 
-## Changes Made
+## Infrastructure Changes
 
-### 1. Lambda Function URLs Added
+### 1. API Gateway Authorizer
 
-**File**: `iqq-providers/template.yaml`
-
-Added Lambda Function URLs for each provider:
-- `ClientProviderUrl` - Client Insurance provider
-- `Route66ProviderUrl` - Route 66 Insurance provider  
-- `APCOProviderUrl` - APCO Insurance provider
-
-Each Function URL includes:
-- `AuthType: NONE` - No authentication (internal use only)
-- Permission for public invocation via Function URL
-- CloudFormation output for easy reference
-
-### 2. DynamoDB Schema Updated
-
-**File**: `scripts/seed-dynamodb.ts`
-
-Provider records now include:
-- `providerUrl` - Lambda Function URL (primary field for invocation)
-- `lambdaArn` - Lambda ARN (kept for backward compatibility)
-
-Example:
-```typescript
-{
-  providerId: 'PROV-CLIENT',
-  providerName: 'Client Insurance',
-  providerUrl: 'https://abc123.lambda-url.us-east-1.on.aws/',
-  lambdaArn: 'arn:aws:lambda:us-east-1:123456789:function:iqq-provider-client-dev',
-  responseFormat: 'CSV',
-  // ...
+**Before:**
+```terraform
+resource "aws_api_gateway_authorizer" "lambda" {
+  name                   = "lambda-authorizer"
+  type                   = "REQUEST"
+  authorizer_uri         = "arn:aws:apigateway:...:function:iqq-authorizer-dev/invocations"
+  identity_source        = "method.request.header.Authorization,method.request.header.x-api-key"
+  authorizer_result_ttl_in_seconds = 0  # No caching
 }
 ```
 
-### 3. Provider Loader Updated
-
-**File**: `iqq-providers/provider-loader/src/index.ts`
-
-Changed to return `providerUrl` instead of `lambdaArn`:
-```typescript
-const providerList = providers.map(provider => ({
-  providerId: provider.providerId,
-  providerName: provider.providerName,
-  providerUrl: provider.providerUrl,  // Changed from lambdaArn
-  responseFormat: provider.responseFormat,
-  // ...
-}));
+**After:**
+```terraform
+resource "aws_api_gateway_authorizer" "cognito" {
+  name          = "cognito-authorizer"
+  type          = "COGNITO_USER_POOLS"
+  provider_arns = [var.cognito_user_pool_arn]
+  authorizer_result_ttl_in_seconds = 300  # 5-minute cache
+}
 ```
 
-### 4. Step Functions State Machine Updated
+### 2. API Methods
 
-**File**: `iqq-infrastructure/modules/step-functions/state-machine-dynamic.json`
+**Before:**
+```terraform
+resource "aws_api_gateway_method" "lender_get" {
+  authorization = "CUSTOM"
+  authorizer_id = aws_api_gateway_authorizer.lambda.id
+  api_key_required = false  # Handled by custom authorizer
+}
+```
 
-Changed from Lambda invoke to HTTP invoke:
+**After:**
+```terraform
+resource "aws_api_gateway_method" "lender_get" {
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  api_key_required = true  # Native API Gateway validation
+}
+```
 
-**Before**:
-```json
-{
-  "Type": "Task",
-  "Resource": "arn:aws:states:::lambda:invoke",
-  "Parameters": {
-    "FunctionName.$": "$.lambdaArn",
-    "Payload": { ... }
+### 3. API Keys
+
+API keys are now managed by API Gateway instead of DynamoDB:
+
+```terraform
+# API Key
+resource "aws_api_gateway_api_key" "default" {
+  name    = "iqq-default-key-dev"
+  enabled = true
+}
+
+# Usage Plan (rate limiting + quotas)
+resource "aws_api_gateway_usage_plan" "standard" {
+  name = "iqq-standard-plan-dev"
+  
+  quota_settings {
+    limit  = 10000  # 10K requests/month
+    period = "MONTH"
+  }
+  
+  throttle_settings {
+    burst_limit = 100  # Max concurrent
+    rate_limit  = 50   # Requests/second
   }
 }
-```
 
-**After**:
-```json
-{
-  "Type": "Task",
-  "Resource": "arn:aws:states:::http:invoke",
-  "Parameters": {
-    "ApiEndpoint.$": "$.providerUrl",
-    "Method": "POST",
-    "RequestBody": { ... },
-    "Authentication": {
-      "ConnectionArn": "NONE"
-    }
-  }
+# Associate key with plan
+resource "aws_api_gateway_usage_plan_key" "default_standard" {
+  key_id        = aws_api_gateway_api_key.default.id
+  usage_plan_id = aws_api_gateway_usage_plan.standard.id
 }
 ```
-
-Response structure also changed:
-- Lambda: `$.providerResponse.Payload.body`
-- HTTP: `$.providerResponse.ResponseBody.body`
-
-### 5. URL Update Script Created
-
-**File**: `scripts/update-provider-urls.ts`
-
-Automated script to:
-1. Fetch Lambda Function URLs from CloudFormation outputs
-2. Update DynamoDB provider records with actual URLs
-3. Run after each deployment to sync URLs
 
 ## Deployment Steps
 
-### Step 1: Deploy Provider Lambdas with Function URLs
-
-```bash
-cd iqq-providers
-
-# Build all functions
-npm run build
-
-# Deploy with SAM
-sam build
-sam deploy --config-env dev
-```
-
-This creates Lambda Function URLs and outputs them in CloudFormation.
-
-### Step 2: Update DynamoDB with Function URLs
-
-```bash
-# Extract URLs from CloudFormation and update DynamoDB
-TABLE_NAME=iqq-config-dev STACK_NAME=iqq-providers-dev ts-node scripts/update-provider-urls.ts
-```
-
-Or manually update the URLs in `scripts/seed-dynamodb.ts` and re-run:
-```bash
-TABLE_NAME=iqq-config-dev ts-node scripts/seed-dynamodb.ts
-```
-
-### Step 3: Deploy Infrastructure with Updated State Machine
+### 1. Apply Terraform Changes
 
 ```bash
 cd iqq-infrastructure
-
-# Initialize and apply Terraform changes
 terraform init
-terraform plan -var-file="environments/dev.tfvars"
-terraform apply -var-file="environments/dev.tfvars"
+terraform plan
+terraform apply
 ```
 
-This deploys the updated Step Functions state machine with HTTP invoke.
+This will:
+- Create Cognito authorizer
+- Update all API methods to use Cognito authorizer
+- Enable native API key validation
+- Remove custom Lambda authorizer references
 
-### Step 4: Test the Integration
+### 2. Get API Gateway API Keys
 
 ```bash
-# Test via API Gateway
-curl -X POST https://your-api-gateway-url/quotes \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: your-api-key" \
-  -d '{
-    "productCode": "MBP",
-    "coverageType": "COMPREHENSIVE",
-    "vehicleValue": 25000,
-    "term": 36
-  }'
+# Get the default API key value
+aws apigateway get-api-key \
+  --api-key $(aws apigateway get-api-keys --query 'items[?name==`iqq-default-key-dev`].id' --output text) \
+  --include-value \
+  --query 'value' \
+  --output text
 ```
 
-Or test Step Functions directly:
-```bash
-aws stepfunctions start-execution \
-  --state-machine-arn arn:aws:states:us-east-1:123456789:stateMachine:iqq-quote-orchestration-dev \
-  --input '{
-    "productCode": "MBP",
-    "coverageType": "COMPREHENSIVE",
-    "vehicleValue": 25000,
-    "term": 36
-  }'
-```
+Save this key - you'll need it for API requests.
 
-## Testing Individual Provider URLs
-
-You can test each provider Function URL directly:
+### 3. Test API with New Authentication
 
 ```bash
-# Test Client Provider (CSV)
-curl -X POST https://your-client-url.lambda-url.us-east-1.on.aws/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "requestContext": {
-      "requestId": "test-123"
-    },
-    "queryStringParameters": {
-      "productCode": "MBP",
-      "coverageType": "COMPREHENSIVE",
-      "vehicleValue": "25000",
-      "term": "36"
-    }
-  }'
+# Get OAuth token from Cognito
+TOKEN=$(curl -X POST https://iqq-auth.auth.us-east-1.amazoncognito.com/oauth2/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET" \
+  | jq -r '.access_token')
 
-# Test Route 66 Provider (JSON)
-curl -X POST https://your-route66-url.lambda-url.us-east-1.on.aws/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "requestContext": {
-      "requestId": "test-456"
-    },
-    "queryStringParameters": {
-      "productCode": "MBP",
-      "coverageType": "COMPREHENSIVE",
-      "vehicleValue": "25000",
-      "term": "36"
-    }
-  }'
+# Get API key from API Gateway
+API_KEY=$(aws apigateway get-api-key \
+  --api-key $(aws apigateway get-api-keys --query 'items[?name==`iqq-default-key-dev`].id' --output text) \
+  --include-value \
+  --query 'value' \
+  --output text)
 
-# Test APCO Provider (XML)
-curl -X POST https://your-apco-url.lambda-url.us-east-1.on.aws/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "requestContext": {
-      "requestId": "test-789"
-    },
-    "queryStringParameters": {
-      "productCode": "MBP",
-      "coverageType": "COMPREHENSIVE",
-      "vehicleValue": "25000",
-      "term": "36"
-    }
-  }'
+# Test API
+curl -X GET https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/products \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "x-api-key: $API_KEY"
 ```
 
-## Monitoring and Debugging
+### 4. (Optional) Remove Custom Authorizer Lambda
 
-### CloudWatch Logs
+Once confirmed working, you can remove the authorizer Lambda:
 
-Each provider Lambda has its own log group:
-- `/aws/lambda/iqq-provider-client-dev`
-- `/aws/lambda/iqq-provider-route66-dev`
-- `/aws/lambda/iqq-provider-apco-dev`
+```bash
+cd iqq-providers
+# Remove authorizer directory
+rm -rf authorizer/
 
-### Step Functions Execution History
+# Update template.yaml to remove AuthorizerFunction resource
 
-View HTTP request/response in Step Functions console:
-1. Go to Step Functions → State Machines
-2. Select `iqq-quote-orchestration-dev`
-3. View execution details
-4. Inspect "InvokeProvider" step to see HTTP request/response
+# Commit and deploy
+git add -A
+git commit -m "Remove custom authorizer Lambda (replaced with Cognito authorizer)"
+git push origin main
+```
 
-### Common Issues
+## API Key Management
 
-**Issue**: Step Functions shows "States.Http.StatusCodeError"
-- **Cause**: Provider Lambda returned non-200 status code
-- **Fix**: Check provider Lambda logs for errors
+### Creating New API Keys
 
-**Issue**: "ApiEndpoint parameter is invalid"
-- **Cause**: `providerUrl` is not set or invalid in DynamoDB
-- **Fix**: Run `update-provider-urls.ts` script or manually update DynamoDB
+```bash
+# Create API key
+aws apigateway create-api-key \
+  --name "partner-x-key-dev" \
+  --description "API key for Partner X" \
+  --enabled
 
-**Issue**: HTTP timeout
-- **Cause**: Provider Lambda taking too long to respond
-- **Fix**: Increase timeout in Step Functions state machine or optimize Lambda
+# Get the key ID
+KEY_ID=$(aws apigateway get-api-keys --query 'items[?name==`partner-x-key-dev`].id' --output text)
 
-## Security Considerations
+# Associate with usage plan
+aws apigateway create-usage-plan-key \
+  --usage-plan-id <usage-plan-id> \
+  --key-id $KEY_ID \
+  --key-type API_KEY
+```
 
-### Current Setup (Development)
-- Function URLs have `AuthType: NONE`
-- No authentication required
-- Suitable for internal Step Functions invocation
+### Revoking API Keys
 
-### Production Recommendations
-1. **Use AWS IAM Authentication**:
-   ```yaml
-   AuthType: AWS_IAM
-   ```
-   
-2. **Add EventBridge Connection** for Step Functions:
-   ```json
-   "Authentication": {
-     "ConnectionArn": "arn:aws:events:us-east-1:123456789:connection/..."
-   }
-   ```
+```bash
+# Disable key
+aws apigateway update-api-key \
+  --api-key <key-id> \
+  --patch-operations op=replace,path=/enabled,value=false
 
-3. **Restrict Function URL Access**:
-   - Use resource policies to allow only Step Functions
-   - Add VPC configuration for private access
+# Or delete permanently
+aws apigateway delete-api-key --api-key <key-id>
+```
 
-4. **Add Request Validation**:
-   - Validate request signature
-   - Check correlation IDs
-   - Rate limiting
+### Viewing Usage
+
+```bash
+# Get usage statistics
+aws apigateway get-usage \
+  --usage-plan-id <usage-plan-id> \
+  --start-date 2024-01-01 \
+  --end-date 2024-01-31
+```
+
+## Monitoring
+
+### CloudWatch Metrics
+
+API Gateway now provides built-in metrics:
+- `Count` - Total API requests
+- `4XXError` - Client errors (including auth failures)
+- `5XXError` - Server errors
+- `Latency` - Request latency
+- `IntegrationLatency` - Backend latency
+
+### Authorization Failures
+
+Check CloudWatch Logs for authorization errors:
+```bash
+aws logs filter-log-events \
+  --log-group-name /aws/apigateway/iqq-dev \
+  --filter-pattern "Unauthorized"
+```
+
+## Troubleshooting
+
+### 401 Unauthorized - Missing API key
+
+Error: `{"message":"Forbidden"}`
+
+Solution: Include `x-api-key` header in request
+
+### 401 Unauthorized - Invalid token
+
+Error: `{"message":"Unauthorized"}`
+
+Causes:
+- Token expired (Cognito tokens expire after 1 hour)
+- Token from wrong user pool
+- Token is ID token instead of access token
+
+Solution: Get fresh access token from Cognito
+
+### 403 Forbidden - Usage limit exceeded
+
+Error: `{"message":"Limit Exceeded"}`
+
+Cause: API key has exceeded usage plan quota or throttle limit
+
+Solution: Wait for quota reset or upgrade to higher usage plan
+
+## Cost Comparison
+
+### Before (Custom Lambda Authorizer):
+- Lambda invocations: $0.20 per 1M requests
+- Lambda duration: $0.0000166667 per GB-second
+- Estimated: ~$5-10/month for 1M requests
+
+### After (Cognito Authorizer):
+- API Gateway requests: $3.50 per 1M requests (same as before)
+- Cognito: Free for first 50K MAU
+- No additional Lambda costs
+- Estimated: ~$0/month additional (included in API Gateway)
+
+**Savings: ~$5-10/month per 1M requests**
+
+## Migration Checklist
+
+- [x] Update Terraform to use Cognito authorizer
+- [x] Remove custom Lambda authorizer references
+- [x] Enable native API key validation
+- [x] Deploy infrastructure changes
+- [ ] Get API Gateway API keys
+- [ ] Test API with new authentication
+- [ ] Update client applications with new API keys
+- [ ] Monitor for authorization errors
+- [ ] (Optional) Remove custom authorizer Lambda code
+- [ ] Update documentation
 
 ## Rollback Plan
 
-If issues occur, you can rollback to Lambda ARN invocation:
+If issues occur, rollback is simple:
 
-1. Revert `state-machine-dynamic.json` to use `lambda:invoke`
-2. Update Provider Loader to return `lambdaArn`
-3. Redeploy infrastructure
+```bash
+cd iqq-infrastructure
+git revert HEAD
+git push origin main
+terraform apply
+```
 
-The `lambdaArn` field is still stored in DynamoDB for backward compatibility.
+This will restore the custom Lambda authorizer.
 
-## Performance Comparison
+## Files Changed
 
-### Lambda Invoke (Before)
-- Latency: ~10-20ms
-- Direct invocation
-- No HTTP overhead
-
-### HTTP Invoke (After)
-- Latency: ~20-50ms
-- HTTP request/response overhead
-- More realistic production scenario
-
-The slight latency increase is acceptable for the benefits of HTTP-based architecture.
+- `iqq-infrastructure/modules/api-gateway/main.tf` - Replaced Lambda authorizer with Cognito
+- `iqq-infrastructure/modules/api-gateway/variables.tf` - Removed authorizer_function_name
+- `iqq-infrastructure/main.tf` - Removed authorizer_function_name parameter
+- `iqq-infrastructure/variables.tf` - Removed authorizer and api_key_required variables
 
 ## Next Steps
 
-1. Monitor HTTP invocation performance in production
-2. Add authentication to Function URLs
-3. Implement request/response logging
-4. Add circuit breaker pattern for provider failures
-5. Consider API Gateway in front of providers for additional features
-
-## References
-
-- [AWS Lambda Function URLs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html)
-- [Step Functions HTTP Integration](https://docs.aws.amazon.com/step-functions/latest/dg/connect-third-party-apis.html)
-- [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
+1. Deploy Terraform changes
+2. Get API Gateway API keys
+3. Test thoroughly
+4. Update client applications
+5. Remove custom authorizer Lambda (optional)
+6. Update API documentation with new authentication flow
