@@ -1,0 +1,454 @@
+name: Add New API Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_version:
+        description: 'New version to add (e.g., v3, v4)'
+        required: true
+        type: string
+      status:
+        description: 'Initial version status'
+        required: true
+        type: choice
+        options:
+          - planned
+          - alpha
+          - beta
+        default: 'planned'
+      migration_guide_url:
+        description: 'Migration guide URL (optional)'
+        required: false
+        type: string
+        default: 'https://docs.iqq.com/api/migration'
+
+env:
+  AWS_REGION: us-east-1
+  GITHUB_ORG: rgcleanslage
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate-version:
+    name: Validate New Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+      previous-version: ${{ steps.validate.outputs.previous_version }}
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+      
+      - name: Validate version format
+        id: validate
+        run: |
+          VERSION="${{ github.event.inputs.new_version }}"
+          
+          # Validate format (v followed by number)
+          if ! [[ "$VERSION" =~ ^v[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "   Expected format: v3, v4, v5, etc."
+            exit 1
+          fi
+          
+          # Check if version already exists
+          if jq -e ".versions[\"$VERSION\"]" config/version-policy.json > /dev/null; then
+            echo "❌ Version $VERSION already exists in configuration"
+            exit 1
+          fi
+          
+          # Get current version
+          CURRENT_VERSION=$(jq -r '.currentVersion' config/version-policy.json)
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "previous_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "✅ Version $VERSION validated"
+          echo "   Previous version: $CURRENT_VERSION"
+          echo "   Status: ${{ github.event.inputs.status }}"
+
+  update-root-config:
+    name: Update Root Configuration
+    needs: validate-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+      
+      - name: Update version policy
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          STATUS="${{ github.event.inputs.status }}"
+          MIGRATION_URL="${{ github.event.inputs.migration_guide_url }}"
+          PREV_VERSION="${{ needs.validate-version.outputs.previous-version }}"
+          
+          echo "📝 Adding $VERSION to version policy..."
+          
+          # Add new version to policy
+          jq --arg version "$VERSION" \
+             --arg status "$STATUS" \
+             --arg migration "${MIGRATION_URL}/${PREV_VERSION}-to-${VERSION}" \
+             '.versions[$version] = {
+               "status": $status,
+               "sunsetDate": null,
+               "migrationGuide": $migration
+             }' \
+             config/version-policy.json > config/version-policy.json.tmp
+          
+          mv config/version-policy.json.tmp config/version-policy.json
+          
+          echo "✅ Version policy updated"
+          cat config/version-policy.json | jq .
+      
+      - name: Update workflow files
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          
+          echo "📝 Updating workflow files to include $VERSION..."
+          
+          # Update deploy-version.yml
+          sed -i '' "/options:/a\\
+          \ \ \ \ \ \ \ \ \ \ - $VERSION" .github/workflows/deploy-version.yml
+          
+          # Update deprecate-version.yml
+          sed -i '' "/options:/a\\
+          \ \ \ \ \ \ \ \ \ \ - $VERSION" .github/workflows/deprecate-version.yml
+          
+          # Update sunset-version.yml
+          sed -i '' "/options:/a\\
+          \ \ \ \ \ \ \ \ \ \ - $VERSION" .github/workflows/sunset-version.yml
+          
+          echo "✅ Workflow files updated"
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          commit-message: "feat: add ${{ needs.validate-version.outputs.version }} to version policy"
+          branch: add-version-${{ needs.validate-version.outputs.version }}
+          title: "Add API Version ${{ needs.validate-version.outputs.version }}"
+          body: |
+            ## Add New API Version: ${{ needs.validate-version.outputs.version }}
+            
+            This PR adds version ${{ needs.validate-version.outputs.version }} to the API versioning configuration.
+            
+            ### Changes
+            - ✅ Updated `config/version-policy.json`
+            - ✅ Updated workflow files to include ${{ needs.validate-version.outputs.version }}
+            
+            ### Configuration
+            - **Version**: ${{ needs.validate-version.outputs.version }}
+            - **Status**: ${{ github.event.inputs.status }}
+            - **Migration Guide**: ${{ github.event.inputs.migration_guide_url }}
+            
+            ### Next Steps
+            1. Review and merge this PR
+            2. Update Terraform infrastructure (see checklist below)
+            3. Deploy services using "Deploy API Version" workflow
+            
+            ### Infrastructure Checklist
+            - [ ] Add ${{ needs.validate-version.outputs.version }} stage to `iqq-infrastructure/modules/api-gateway/main.tf`
+            - [ ] Add Lambda permissions for ${{ needs.validate-version.outputs.version }} (4 services)
+            - [ ] Add stage URL output
+            - [ ] Run `terraform apply`
+            
+            ### Service Deployment Checklist
+            - [ ] Update service version policies (automated by workflow)
+            - [ ] Deploy all services via GitHub Actions
+            - [ ] Test endpoints
+            - [ ] Verify version headers
+            
+            ---
+            
+            **Automated by**: Add New API Version workflow
+            **Triggered by**: @${{ github.actor }}
+
+  update-infrastructure:
+    name: Create Infrastructure PR
+    needs: [validate-version, update-root-config]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITHUB_ORG }}/iqq-infrastructure
+          token: ${{ secrets.PAT_TOKEN }}
+      
+      - name: Generate Terraform changes
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          
+          echo "📝 Generating Terraform configuration for $VERSION..."
+          
+          # Create a file with the new stage configuration
+          cat > /tmp/new-stage.tf << EOF
+          # $VERSION stage
+          resource "aws_api_gateway_stage" "$VERSION" {
+            deployment_id = aws_api_gateway_deployment.main.id
+            rest_api_id   = aws_api_gateway_rest_api.main.id
+            stage_name    = "$VERSION"
+            
+            variables = {
+              lambdaAlias = "$VERSION"
+            }
+            
+            xray_tracing_enabled = true
+            
+            access_log_settings {
+              destination_arn = aws_cloudwatch_log_group.api_gateway.arn
+              format = jsonencode({
+                requestId      = "\$context.requestId"
+                ip             = "\$context.identity.sourceIp"
+                requestTime    = "\$context.requestTime"
+                httpMethod     = "\$context.httpMethod"
+                resourcePath   = "\$context.resourcePath"
+                status         = "\$context.status"
+                protocol       = "\$context.protocol"
+                responseLength = "\$context.responseLength"
+                stage          = "\$context.stage"
+                lambdaAlias    = "\$stageVariables.lambdaAlias"
+              })
+            }
+            
+            tags = merge(
+              var.common_tags,
+              {
+                Name        = "\${var.project_name}-api-$VERSION-\${var.environment}"
+                Stage       = "$VERSION"
+                Environment = var.environment
+              }
+            )
+          }
+          
+          # Lambda permissions for $VERSION
+          resource "aws_lambda_permission" "package_$VERSION" {
+            statement_id  = "AllowAPIGatewayInvoke${VERSION^^}"
+            function_name = var.package_function_name
+            principal     = "apigateway.amazonaws.com"
+            source_arn    = "\${aws_api_gateway_rest_api.main.execution_arn}/$VERSION/GET/package"
+            qualifier     = "$VERSION"
+          }
+          
+          resource "aws_lambda_permission" "lender_$VERSION" {
+            statement_id  = "AllowAPIGatewayInvoke${VERSION^^}"
+            function_name = var.lender_function_name
+            principal     = "apigateway.amazonaws.com"
+            source_arn    = "\${aws_api_gateway_rest_api.main.execution_arn}/$VERSION/GET/lender"
+            qualifier     = "$VERSION"
+          }
+          
+          resource "aws_lambda_permission" "product_$VERSION" {
+            statement_id  = "AllowAPIGatewayInvoke${VERSION^^}"
+            function_name = var.product_function_name
+            principal     = "apigateway.amazonaws.com"
+            source_arn    = "\${aws_api_gateway_rest_api.main.execution_arn}/$VERSION/GET/product"
+            qualifier     = "$VERSION"
+          }
+          
+          resource "aws_lambda_permission" "document_$VERSION" {
+            statement_id  = "AllowAPIGatewayInvoke${VERSION^^}"
+            function_name = var.document_function_name
+            principal     = "apigateway.amazonaws.com"
+            source_arn    = "\${aws_api_gateway_rest_api.main.execution_arn}/$VERSION/GET/document"
+            qualifier     = "$VERSION"
+          }
+          EOF
+          
+          echo "✅ Terraform configuration generated"
+          echo ""
+          echo "Generated configuration:"
+          cat /tmp/new-stage.tf
+      
+      - name: Create infrastructure instructions
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          
+          cat > INFRASTRUCTURE_UPDATE.md << EOF
+          # Infrastructure Update for $VERSION
+          
+          ## Manual Steps Required
+          
+          This workflow has generated the Terraform configuration for version $VERSION.
+          Please follow these steps to complete the infrastructure setup:
+          
+          ### 1. Add Stage Configuration
+          
+          Edit \`modules/api-gateway/main.tf\` and add the following at the end of the file:
+          
+          \`\`\`hcl
+          $(cat /tmp/new-stage.tf)
+          \`\`\`
+          
+          ### 2. Add Output
+          
+          Edit \`modules/api-gateway/outputs.tf\` and add:
+          
+          \`\`\`hcl
+          output "${VERSION}_stage_url" {
+            description = "URL for $VERSION stage"
+            value       = "\${aws_api_gateway_stage.${VERSION}.invoke_url}"
+          }
+          \`\`\`
+          
+          ### 3. Apply Terraform
+          
+          \`\`\`bash
+          terraform init
+          terraform plan
+          terraform apply
+          \`\`\`
+          
+          ### 4. Verify Stage
+          
+          \`\`\`bash
+          aws apigateway get-stage \\
+            --rest-api-id \$(terraform output -raw api_gateway_id) \\
+            --stage-name $VERSION
+          \`\`\`
+          
+          ---
+          
+          **Note**: These changes must be applied manually because Terraform modifications
+          require careful review and testing.
+          EOF
+          
+          echo "✅ Infrastructure instructions created"
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          commit-message: "feat: add ${{ needs.validate-version.outputs.version }} infrastructure configuration"
+          branch: add-version-${{ needs.validate-version.outputs.version }}
+          title: "Infrastructure: Add API Version ${{ needs.validate-version.outputs.version }}"
+          body: |
+            ## Infrastructure Update for ${{ needs.validate-version.outputs.version }}
+            
+            This PR provides the Terraform configuration for version ${{ needs.validate-version.outputs.version }}.
+            
+            ### ⚠️ Manual Steps Required
+            
+            Please see `INFRASTRUCTURE_UPDATE.md` for detailed instructions.
+            
+            ### Quick Summary
+            
+            1. Add stage resource to `modules/api-gateway/main.tf`
+            2. Add Lambda permissions (4 services)
+            3. Add output to `modules/api-gateway/outputs.tf`
+            4. Run `terraform apply`
+            
+            ### After Terraform Apply
+            
+            Run the "Deploy API Version" workflow:
+            - Version: ${{ needs.validate-version.outputs.version }}
+            - Services: all
+            - Environment: dev
+            
+            ---
+            
+            **Automated by**: Add New API Version workflow
+            **Triggered by**: @${{ github.actor }}
+
+  update-service-configs:
+    name: Update Service Configurations
+    needs: validate-version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [package, lender, product, document]
+    steps:
+      - name: Checkout service repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITHUB_ORG }}/iqq-${{ matrix.service }}-service
+          token: ${{ secrets.PAT_TOKEN }}
+      
+      - name: Update version policy
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          STATUS="${{ github.event.inputs.status }}"
+          MIGRATION_URL="${{ github.event.inputs.migration_guide_url }}"
+          PREV_VERSION="${{ needs.validate-version.outputs.previous-version }}"
+          
+          echo "📝 Adding $VERSION to iqq-${{ matrix.service }}-service version policy..."
+          
+          jq --arg version "$VERSION" \
+             --arg status "$STATUS" \
+             --arg migration "${MIGRATION_URL}/${PREV_VERSION}-to-${VERSION}" \
+             '.versions[$version] = {
+               "status": $status,
+               "sunsetDate": null,
+               "migrationGuide": $migration
+             }' \
+             src/config/version-policy.json > src/config/version-policy.json.tmp
+          
+          mv src/config/version-policy.json.tmp src/config/version-policy.json
+          
+          echo "✅ Version policy updated for ${{ matrix.service }} service"
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          commit-message: "feat: add ${{ needs.validate-version.outputs.version }} to version policy"
+          branch: add-version-${{ needs.validate-version.outputs.version }}
+          title: "Add Version ${{ needs.validate-version.outputs.version }} Configuration"
+          body: |
+            ## Add Version ${{ needs.validate-version.outputs.version }}
+            
+            Updates version policy configuration for the ${{ matrix.service }} service.
+            
+            ### Changes
+            - ✅ Updated `src/config/version-policy.json`
+            
+            ### Configuration
+            - **Version**: ${{ needs.validate-version.outputs.version }}
+            - **Status**: ${{ github.event.inputs.status }}
+            
+            ### Next Steps
+            1. Review and merge this PR
+            2. Wait for infrastructure deployment
+            3. Deploy via "Deploy API Version" workflow
+            
+            ---
+            
+            **Automated by**: Add New API Version workflow
+            **Part of**: Root PR #[link to root PR]
+
+  notify-completion:
+    name: Notify Completion
+    needs: [validate-version, update-root-config, update-infrastructure, update-service-configs]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📦 Add New API Version Complete"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Version: $VERSION"
+          echo "Status: ${{ github.event.inputs.status }}"
+          echo ""
+          echo "✅ Pull requests created in:"
+          echo "   - iqq-project (root repository)"
+          echo "   - iqq-infrastructure"
+          echo "   - iqq-package-service"
+          echo "   - iqq-lender-service"
+          echo "   - iqq-product-service"
+          echo "   - iqq-document-service"
+          echo ""
+          echo "📋 Next Steps:"
+          echo "   1. Review and merge all PRs"
+          echo "   2. Follow infrastructure update instructions"
+          echo "   3. Run 'Deploy API Version' workflow"
+          echo "   4. Test new version endpoints"
+          echo ""
+          echo "🔗 Workflow Run:"
+          echo "   https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo ""
