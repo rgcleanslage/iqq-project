@@ -1,0 +1,382 @@
+{
+  "info": {
+    "name": "iQQ Insurance Quote API - Fixed",
+    "description": "Complete API collection with working OAuth authentication and automatic client ID mapping from API keys",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.2.0"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Get OAuth Token (Working)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Get credentials from environment",
+                  "const clientId = pm.environment.get('clientId');",
+                  "const clientSecret = pm.environment.get('clientSecret');",
+                  "",
+                  "if (!clientId || !clientSecret) {",
+                  "    console.error('ERROR: clientId or clientSecret not set in environment');",
+                  "    throw new Error('Missing credentials in environment');",
+                  "}",
+                  "",
+                  "// Encode credentials as Base64",
+                  "const credentials = clientId + ':' + clientSecret;",
+                  "const base64Credentials = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(credentials));",
+                  "",
+                  "console.log('✓ Credentials encoded');",
+                  "console.log('Client ID:', clientId);",
+                  "console.log('Base64 (first 30 chars):', base64Credentials.substring(0, 30) + '...');",
+                  "",
+                  "// Set authorization header directly in the request",
+                  "pm.request.headers.upsert({",
+                  "    key: 'Authorization',",
+                  "    value: 'Basic ' + base64Credentials",
+                  "});",
+                  "",
+                  "console.log('✓ Authorization header set');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    if (jsonData.access_token) {",
+                  "        pm.environment.set('accessToken', jsonData.access_token);",
+                  "        const expiryTime = Date.now() + ((jsonData.expires_in - 300) * 1000);",
+                  "        pm.environment.set('tokenExpiry', expiryTime);",
+                  "        ",
+                  "        console.log('✓ SUCCESS: Token obtained and saved');",
+                  "        console.log('Token expires in:', jsonData.expires_in, 'seconds');",
+                  "        console.log('Token (first 50 chars):', jsonData.access_token.substring(0, 50) + '...');",
+                  "    }",
+                  "} else {",
+                  "    console.error('✗ FAILED: Status', pm.response.code);",
+                  "    console.error('Response:', pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "iqq-api/read",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token",
+              "protocol": "https",
+              "host": [
+                "iqq-dev-ib9i1hvt",
+                "auth",
+                "us-east-1",
+                "amazoncognito",
+                "com"
+              ],
+              "path": [
+                "oauth2",
+                "token"
+              ]
+            },
+            "description": "Get OAuth token with automatic credential encoding.\n\nRequires environment variables:\n- clientId\n- clientSecret\n\nThe pre-request script will encode credentials and set the Authorization header."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Package",
+      "item": [
+        {
+          "name": "Get Package (Default Client - CLI001)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Client ID is automatically extracted from API key tags"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60 months",
+              "host": ["{{baseUrl}}"],
+              "path": ["package"],
+              "query": [
+                {
+                  "key": "productCode",
+                  "value": "MBP"
+                },
+                {
+                  "key": "coverageType",
+                  "value": "COMPREHENSIVE"
+                },
+                {
+                  "key": "vehicleValue",
+                  "value": "25000"
+                },
+                {
+                  "key": "term",
+                  "value": "60 months"
+                }
+              ]
+            },
+            "description": "Get package with automatic client ID mapping.\n\nThe API key is tagged with clientId=CLI001 which:\n- Blocks APCO Insurance\n- Returns max 2 providers\n\nExpected result: 2 quotes (Client Direct, Route66)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Package (With Client Preferences - CLI001)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Client ID automatically extracted from API key tags (CLI001)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60 months",
+              "host": ["{{baseUrl}}"],
+              "path": ["package"],
+              "query": [
+                {
+                  "key": "productCode",
+                  "value": "MBP"
+                },
+                {
+                  "key": "coverageType",
+                  "value": "COMPREHENSIVE"
+                },
+                {
+                  "key": "vehicleValue",
+                  "value": "25000"
+                },
+                {
+                  "key": "term",
+                  "value": "60 months"
+                }
+              ]
+            },
+            "description": "DEPRECATED: Use 'Get Package (Default Client - CLI001)' instead.\n\nThis request is identical to the default client request since clientId is now automatically extracted from the API key tags.\n\nNote: The clientId query parameter is no longer used or required."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Package (With Client Preferences - CLI002)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "description": "Client ID automatically extracted from API key tags (CLI002)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60 months",
+              "host": ["{{baseUrl}}"],
+              "path": ["package"],
+              "query": [
+                {
+                  "key": "productCode",
+                  "value": "MBP"
+                },
+                {
+                  "key": "coverageType",
+                  "value": "COMPREHENSIVE"
+                },
+                {
+                  "key": "vehicleValue",
+                  "value": "25000"
+                },
+                {
+                  "key": "term",
+                  "value": "60 months"
+                }
+              ]
+            },
+            "description": "DEPRECATED: Use Partner A environment with Partner A credentials instead.\n\nTo test CLI002 preferences:\n1. Switch to 'Partner A' environment\n2. Get OAuth token (uses Partner A credentials)\n3. Run this request (uses Partner A API key)\n\nCLI002 preferences:\n- Only allows Client Insurance and Route 66\n- Expected result: 2 quotes\n\nNote: The clientId query parameter is no longer used or required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Lender",
+      "item": [
+        {
+          "name": "Get Lender",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/lender",
+              "host": ["{{baseUrl}}"],
+              "path": ["lender"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "item": [
+        {
+          "name": "Get Product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Document",
+      "item": [
+        {
+          "name": "Get Document",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/document",
+              "host": ["{{baseUrl}}"],
+              "path": ["document"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev",
+      "type": "string"
+    }
+  ]
+}

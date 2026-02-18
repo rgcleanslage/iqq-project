@@ -1,0 +1,794 @@
+openapi: 3.0.3
+info:
+  title: iQQ Insurance Quote API
+  description: |
+    API for managing insurance quotes, products, lenders, and documents.
+    
+    ## Authentication
+    This API uses OAuth 2.0 Client Credentials flow with Cognito for authentication.
+    All endpoints (except /oauth/token) require:
+    - Bearer token in Authorization header
+    - API key in x-api-key header
+    
+    ## Getting Started
+    1. Obtain an access token from `/oauth/token` endpoint
+    2. Use the token in the Authorization header for all API calls
+    3. Include your API key in the x-api-key header
+    
+  version: 1.0.0
+  contact:
+    name: iQQ API Support
+    email: api-support@iqq.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev
+    description: Development environment
+  - url: https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/prod
+    description: Production environment
+
+tags:
+  - name: Authentication
+    description: OAuth 2.0 token management
+  - name: Package
+    description: Multi-provider quote packages
+  - name: Lender
+    description: Lender information
+  - name: Product
+    description: Product catalog
+  - name: Document
+    description: Document management
+
+paths:
+  /oauth/token:
+    post:
+      tags:
+        - Authentication
+      summary: Get OAuth 2.0 Access Token
+      description: |
+        Obtain an access token using OAuth 2.0 Client Credentials flow.
+        This endpoint is hosted by AWS Cognito.
+        
+        **Note**: This is the Cognito OAuth endpoint, not part of the main API Gateway.
+      operationId: getAccessToken
+      servers:
+        - url: https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com
+          description: Cognito OAuth endpoint
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - grant_type
+                - scope
+              properties:
+                grant_type:
+                  type: string
+                  enum:
+                    - client_credentials
+                  description: OAuth 2.0 grant type
+                  example: client_credentials
+                scope:
+                  type: string
+                  description: Requested scope
+                  example: iqq-api/read
+            example:
+              grant_type: client_credentials
+              scope: iqq-api/read
+      responses:
+        '200':
+          description: Access token successfully generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              example:
+                access_token: eyJraWQiOiJxxx...
+                expires_in: 3600
+                token_type: Bearer
+        '400':
+          description: Bad request - Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Invalid client credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /package:
+    get:
+      tags:
+        - Package
+      summary: Get Multi-Provider Quote Package
+      description: |
+        Orchestrates quote requests to multiple insurance providers in parallel
+        and returns an aggregated package with pricing analysis.
+        
+        This endpoint uses AWS Step Functions to coordinate provider calls.
+      operationId: getPackage
+      security:
+        - bearerAuth: []
+          apiKey: []
+      parameters:
+        - name: productCode
+          in: query
+          description: Product code (e.g., MBP for Mechanical Breakdown Protection)
+          required: false
+          schema:
+            type: string
+            default: MBP
+            example: MBP
+        - name: coverageType
+          in: query
+          description: Type of coverage
+          required: false
+          schema:
+            type: string
+            default: COMPREHENSIVE
+            enum:
+              - COMPREHENSIVE
+              - BASIC
+              - PREMIUM
+            example: COMPREHENSIVE
+        - name: vehicleValue
+          in: query
+          description: Vehicle value in USD
+          required: false
+          schema:
+            type: integer
+            default: 25000
+            minimum: 1000
+            maximum: 500000
+            example: 25000
+        - name: term
+          in: query
+          description: Coverage term
+          required: false
+          schema:
+            type: string
+            default: "60 months"
+            example: "60 months"
+      responses:
+        '200':
+          description: Package successfully generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+        '400':
+          description: Bad request - Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /lender:
+    get:
+      tags:
+        - Lender
+      summary: Get Lender Information
+      description: Retrieve detailed information about the lender including contact details and ratings
+      operationId: getLender
+      security:
+        - bearerAuth: []
+          apiKey: []
+      responses:
+        '200':
+          description: Lender information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lender'
+        '401':
+          description: Unauthorized - Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /product:
+    get:
+      tags:
+        - Product
+      summary: Get Product Information
+      description: Retrieve detailed product information including coverage details and available providers
+      operationId: getProduct
+      security:
+        - bearerAuth: []
+          apiKey: []
+      responses:
+        '200':
+          description: Product information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          description: Unauthorized - Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /document:
+    get:
+      tags:
+        - Document
+      summary: Get Document Information
+      description: Retrieve document metadata and access information
+      operationId: getDocument
+      security:
+        - bearerAuth: []
+          apiKey: []
+      responses:
+        '200':
+          description: Document information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          description: Unauthorized - Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        OAuth 2.0 Bearer token from Cognito.
+        Obtain from /oauth/token endpoint.
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key for request authentication
+    basicAuth:
+      type: http
+      scheme: basic
+      description: |
+        Basic authentication using Client ID and Client Secret.
+        Format: Base64(client_id:client_secret)
+
+  schemas:
+    TokenResponse:
+      type: object
+      required:
+        - access_token
+        - expires_in
+        - token_type
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+          example: eyJraWQiOiJxxx...
+        expires_in:
+          type: integer
+          description: Token expiration time in seconds
+          example: 3600
+        token_type:
+          type: string
+          description: Token type
+          example: Bearer
+
+    Package:
+      type: object
+      required:
+        - packageId
+        - packageName
+        - packageType
+        - request
+        - providerQuotes
+        - pricing
+        - summary
+        - metadata
+      properties:
+        packageId:
+          type: string
+          description: Unique package identifier
+          example: PKG-1771346662785
+        packageName:
+          type: string
+          description: Package name
+          example: Multi-Provider Quote Package
+        packageType:
+          type: string
+          description: Type of package
+          example: Aggregated
+        request:
+          type: object
+          description: Original request parameters
+          properties:
+            productCode:
+              type: string
+              example: MBP
+            coverageType:
+              type: string
+              example: COMPREHENSIVE
+            vehicleValue:
+              type: integer
+              example: 25000
+            term:
+              type: string
+              example: "60 months"
+        providerQuotes:
+          type: array
+          description: Quotes from all providers
+          items:
+            $ref: '#/components/schemas/ProviderQuote'
+        pricing:
+          $ref: '#/components/schemas/Pricing'
+        bestQuote:
+          $ref: '#/components/schemas/BestQuote'
+        summary:
+          $ref: '#/components/schemas/PackageSummary'
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+
+    ProviderQuote:
+      type: object
+      required:
+        - provider
+        - providerId
+        - providerRating
+        - quoteId
+        - premium
+        - coverageAmount
+        - termMonths
+        - timestamp
+      properties:
+        provider:
+          type: string
+          description: Provider name
+          example: Route 66 Insurance
+        providerId:
+          type: string
+          description: Provider identifier
+          example: PROV-ROUTE66
+        providerRating:
+          type: string
+          description: Provider credit rating
+          example: A
+        quoteId:
+          type: string
+          description: Unique quote identifier
+          example: R66-1771346662629-c7pconsc4
+        premium:
+          type: number
+          format: double
+          description: Quote premium amount
+          example: 1149.99
+        coverageAmount:
+          type: integer
+          description: Coverage amount in USD
+          example: 25000
+        termMonths:
+          type: integer
+          description: Coverage term in months
+          example: 60
+        timestamp:
+          type: string
+          format: date-time
+          description: Quote generation timestamp
+          example: "2026-02-17T16:44:22.629Z"
+
+    Pricing:
+      type: object
+      required:
+        - basePrice
+        - discountPercentage
+        - totalPrice
+        - currency
+        - averagePremium
+      properties:
+        basePrice:
+          type: number
+          format: double
+          description: Base price (best quote premium)
+          example: 1149.99
+        discountPercentage:
+          type: number
+          format: double
+          description: Applied discount percentage
+          example: 5
+        totalPrice:
+          type: number
+          format: double
+          description: Final price after discount
+          example: 1092.49
+        currency:
+          type: string
+          description: Currency code
+          example: USD
+        averagePremium:
+          type: number
+          format: double
+          description: Average premium across all quotes
+          example: 1229.16
+
+    BestQuote:
+      type: object
+      required:
+        - provider
+        - providerId
+        - premium
+        - savings
+      properties:
+        provider:
+          type: string
+          description: Best quote provider name
+          example: Route 66 Insurance
+        providerId:
+          type: string
+          description: Provider identifier
+          example: PROV-ROUTE66
+        premium:
+          type: number
+          format: double
+          description: Best quote premium
+          example: 1149.99
+        savings:
+          type: number
+          format: double
+          description: Savings compared to average
+          example: 79.17
+
+    PackageSummary:
+      type: object
+      required:
+        - totalQuotes
+        - successfulQuotes
+        - failedProviders
+        - errors
+      properties:
+        totalQuotes:
+          type: integer
+          description: Total number of quotes received
+          example: 3
+        successfulQuotes:
+          type: integer
+          description: Number of successful quotes
+          example: 3
+        failedProviders:
+          type: integer
+          description: Number of failed provider calls
+          example: 0
+        errors:
+          type: array
+          description: List of errors from failed providers
+          items:
+            type: object
+            properties:
+              provider:
+                type: string
+              error:
+                type: string
+
+    Lender:
+      type: object
+      required:
+        - lenderId
+        - lenderName
+        - lenderType
+        - contactInfo
+        - productsOffered
+        - ratingInfo
+        - metadata
+      properties:
+        lenderId:
+          type: string
+          description: Unique lender identifier
+          example: LENDER-001
+        lenderName:
+          type: string
+          description: Lender name
+          example: Premium Auto Finance
+        lenderType:
+          type: string
+          description: Type of lender
+          example: Captive
+        contactInfo:
+          type: object
+          properties:
+            phone:
+              type: string
+              example: "1-800-555-0100"
+            email:
+              type: string
+              format: email
+              example: quotes@premiumautofinance.com
+            website:
+              type: string
+              format: uri
+              example: https://www.premiumautofinance.com
+        productsOffered:
+          type: array
+          items:
+            type: string
+          example: ["MBP", "GAP", "Vehicle Depreciation Protection"]
+        ratingInfo:
+          type: object
+          properties:
+            creditRating:
+              type: string
+              example: A+
+            yearsInBusiness:
+              type: integer
+              example: 25
+            customerSatisfactionScore:
+              type: number
+              format: double
+              example: 4.7
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+
+    Product:
+      type: object
+      required:
+        - productId
+        - productName
+        - productType
+        - description
+        - coverage
+        - pricing
+        - providers
+        - metadata
+      properties:
+        productId:
+          type: string
+          description: Unique product identifier
+          example: PROD-001
+        productName:
+          type: string
+          description: Product name
+          example: Mechanical Breakdown Protection
+        productType:
+          type: string
+          description: Product type code
+          example: MBP
+        description:
+          type: string
+          description: Product description
+          example: Comprehensive coverage for mechanical and electrical failures
+        coverage:
+          type: object
+          properties:
+            coverageType:
+              type: string
+              example: Comprehensive
+            coverageLimit:
+              type: integer
+              example: 100000
+            deductible:
+              type: integer
+              example: 100
+            term:
+              type: string
+              example: "60 months / 60,000 miles"
+            exclusions:
+              type: array
+              items:
+                type: string
+              example: ["Pre-existing conditions", "Wear and tear items"]
+        pricing:
+          type: object
+          properties:
+            basePremium:
+              type: number
+              format: double
+              example: 1199.99
+            adminFee:
+              type: number
+              format: double
+              example: 50
+            taxRate:
+              type: number
+              format: double
+              example: 0.06
+            totalPremium:
+              type: number
+              format: double
+              example: 1324.99
+            currency:
+              type: string
+              example: USD
+        providers:
+          type: array
+          items:
+            type: object
+            properties:
+              providerId:
+                type: string
+                example: PROV-CLIENT
+              providerName:
+                type: string
+                example: Client Insurance
+              rating:
+                type: string
+                example: A+
+              available:
+                type: boolean
+                example: true
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+
+    Document:
+      type: object
+      required:
+        - documentId
+        - documentName
+        - documentType
+        - status
+        - content
+        - metadata
+      properties:
+        documentId:
+          type: string
+          description: Unique document identifier
+          example: DOC-001
+        documentName:
+          type: string
+          description: Document name
+          example: Insurance Policy Document
+        documentType:
+          type: string
+          description: Type of document
+          example: Policy
+        status:
+          type: string
+          description: Document status
+          example: Issued
+        content:
+          type: object
+          properties:
+            format:
+              type: string
+              example: PDF
+            size:
+              type: integer
+              description: File size in bytes
+              example: 245678
+            url:
+              type: string
+              format: uri
+              example: https://s3.amazonaws.com/iqq-documents/policy-doc-001.pdf
+            checksum:
+              type: string
+              example: a3f5c8b9e2d1f4a6c7b8e9d0f1a2b3c4
+        metadata:
+          type: object
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+              example: "2024-01-15T10:30:00Z"
+            updatedAt:
+              type: string
+              format: date-time
+              example: "2026-02-17T16:45:38.054Z"
+            createdBy:
+              type: string
+              example: system
+            version:
+              type: string
+              example: "1.0.0"
+            correlationId:
+              type: string
+              example: 328d5137-cbc3-4ed3-8eda-8b4c77666228
+            tags:
+              type: array
+              items:
+                type: string
+              example: ["policy", "auto-insurance", "mbp", "active"]
+
+    Metadata:
+      type: object
+      required:
+        - timestamp
+        - version
+        - correlationId
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Response generation timestamp
+          example: "2026-02-17T16:44:22.785Z"
+        version:
+          type: string
+          description: API version
+          example: "1.0.0"
+        correlationId:
+          type: string
+          description: Request correlation ID for tracing
+          example: a4d5672e-6d2c-4af3-9d88-b0a0b04b370b
+        executionTime:
+          type: string
+          format: date-time
+          description: Execution completion time (for async operations)
+          example: "2026-02-17T16:44:22.777Z"
+
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Error message
+          example: Unauthorized
+        error:
+          type: string
+          description: Error type
+          example: invalid_token
+        correlationId:
+          type: string
+          description: Request correlation ID
+          example: a4d5672e-6d2c-4af3-9d88-b0a0b04b370b

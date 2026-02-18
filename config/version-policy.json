@@ -1,0 +1,58 @@
+{
+  "currentVersion": "v1",
+  "supportedVersions": ["v1", "v2"],
+  "versions": {
+    "v1": {
+      "status": "stable",
+      "sunsetDate": null,
+      "migrationGuide": null,
+      "lambdaAlias": "v1",
+      "description": "Initial stable version",
+      "releaseDate": "2026-02-18T00:00:00Z",
+      "lastDeployed": null,
+      "breakingChanges": []
+    },
+    "v2": {
+      "status": "planned",
+      "sunsetDate": null,
+      "migrationGuide": "https://docs.iqq.com/api/migration/v1-to-v2",
+      "lambdaAlias": "v2",
+      "description": "Next version with enhanced features",
+      "releaseDate": null,
+      "lastDeployed": null,
+      "breakingChanges": []
+    }
+  },
+  "deprecationPolicy": {
+    "warningPeriodDays": 90,
+    "sunsetPeriodDays": 180,
+    "minimumSupportedVersions": 2
+  },
+  "services": {
+    "package": {
+      "repository": "https://github.com/rgcleanslage/iqq-package-service",
+      "lambdaFunction": "iqq-package-service-dev"
+    },
+    "lender": {
+      "repository": "https://github.com/rgcleanslage/iqq-lender-service",
+      "lambdaFunction": "iqq-lender-service-dev"
+    },
+    "product": {
+      "repository": "https://github.com/rgcleanslage/iqq-product-service",
+      "lambdaFunction": "iqq-product-service-dev"
+    },
+    "document": {
+      "repository": "https://github.com/rgcleanslage/iqq-document-service",
+      "lambdaFunction": "iqq-document-service-dev"
+    }
+  },
+  "infrastructure": {
+    "repository": "https://github.com/rgcleanslage/iqq-infrastructure",
+    "apiGatewayId": "r8ukhidr1m"
+  },
+  "metadata": {
+    "lastUpdated": "2026-02-18T00:00:00Z",
+    "updatedBy": "system",
+    "schemaVersion": "1.0.0"
+  }
+}

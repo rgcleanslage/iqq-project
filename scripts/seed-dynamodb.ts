@@ -248,10 +248,36 @@ const mappings = [
   }
 ];
 
+// Sample client preferences
+const preferences = [
+  {
+    PK: 'CLIENT#CLI001',
+    SK: 'PREFERENCES',
+    GSI1PK: 'PREFERENCES',
+    GSI1SK: 'CLIENT#CLI001',
+    clientId: 'CLI001',
+    allowedProviders: ['PROV-CLIENT', 'PROV-ROUTE66'], // Whitelist: only these providers
+    preferredProviders: ['PROV-CLIENT'], // Prefer Client Insurance first
+    maxProviders: 2, // Only get quotes from 2 providers
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    PK: 'CLIENT#CLI002',
+    SK: 'PREFERENCES',
+    GSI1PK: 'PREFERENCES',
+    GSI1SK: 'CLIENT#CLI002',
+    clientId: 'CLI002',
+    allowedProviders: ['PROV-CLIENT', 'PROV-ROUTE66'], // Whitelist: only these two providers
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+];
+
 async function seedData() {
   console.log(`🌱 Seeding DynamoDB table: ${TABLE_NAME}`);
   
-  const allItems = [...clients, ...products, ...providers, ...mappings];
+  const allItems = [...clients, ...products, ...providers, ...mappings, ...preferences];
   
   // DynamoDB BatchWrite can handle max 25 items at a time
   const batchSize = 25;
@@ -284,6 +310,7 @@ async function seedData() {
   console.log(`  - Products: ${products.length}`);
   console.log(`  - Providers: ${providers.length}`);
   console.log(`  - Mappings: ${mappings.length}`);
+  console.log(`  - Preferences: ${preferences.length}`);
 }
 
 // Run the seed function

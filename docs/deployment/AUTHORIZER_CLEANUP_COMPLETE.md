@@ -1,213 +1,132 @@
-# Custom Authorizer Cleanup - Complete
+# Custom TOKEN Authorizer Implementation - Complete
 
-## Summary
+## Overview
+Successfully migrated from COGNITO_USER_POOLS authorizer to custom TOKEN authorizer with native API Gateway API key validation. This architecture properly supports OAuth 2.0 client_credentials flow while maintaining API key rate limiting.
 
-Successfully removed all custom Lambda authorizer code and resources. The API now uses AWS API Gateway's native Cognito authorizer with built-in API key management.
+## What Was Done
 
-## What Was Removed
+### 1. Created Custom TOKEN Authorizer Lambda
+**File**: `iqq-providers/authorizer/src/token-authorizer.ts`
 
-### 1. Code (iqq-providers repository)
-- ✅ `authorizer/` directory (entire custom authorizer Lambda)
-  - `authorizer/src/request-authorizer.ts` - Custom authorizer logic
-  - `authorizer/tests/request-authorizer.test.ts` - Tests
-  - `authorizer/package.json` - Dependencies
-  - `authorizer/tsconfig.json` - TypeScript config
-  - `authorizer/Makefile` - Build script
-- ✅ AuthorizerFunction resource from `template.yaml`
-- ✅ AuthorizerLogGroup resource from `template.yaml`
-- ✅ AuthorizerArn output from `template.yaml`
+- Validates OAuth access tokens from Cognito
+- Verifies JWT signature using JWKS
+- Checks token_use is 'access' (required for client_credentials flow)
+- Returns IAM policy with Allow/Deny
+- Includes context with clientId, scope, and tokenUse
 
-### 2. Scripts (iqq-project repository)
-- ✅ `scripts/add-api-keys.ts` - DynamoDB API key management (no longer needed)
-- ✅ `docs/deployment/API_KEY_BEHAVIOR.md` - DynamoDB API key docs
-- ✅ `docs/deployment/API_KEY_DEPLOYMENT_GUIDE.md` - DynamoDB deployment guide
+### 2. Updated SAM Template
+**File**: `iqq-providers/template.yaml`
 
-### 3. AWS Resources
-- ✅ Lambda function: `iqq-authorizer-dev` (deleted)
-- ✅ CloudWatch log group: `/aws/lambda/iqq-authorizer-dev` (deleted)
-- ✅ IAM role: `iqq-authorizer-invocation-dev` (removed by Terraform)
-- ✅ IAM policy: authorizer invocation policy (removed by Terraform)
+- Added AuthorizerFunction resource
+- Handler: `dist/token-authorizer.handler`
+- Environment: USER_POOL_ID configured
+- Build method: makefile (for TypeScript compilation)
 
-### 4. Infrastructure (iqq-infrastructure repository)
-- ✅ Custom Lambda authorizer resource (replaced with Cognito)
-- ✅ Authorizer IAM roles and policies (removed)
-- ✅ Lambda authorizer permissions (removed)
-- ✅ Variables: `authorizer_function_name`, `api_key_required` (removed)
+### 3. Updated Terraform Infrastructure
+**File**: `iqq-infrastructure/modules/api-gateway/main.tf`
 
-## What Remains (Active)
+- Changed authorizer type from COGNITO_USER_POOLS to TOKEN
+- Added IAM role for API Gateway to invoke authorizer
+- Updated all API methods to use CUSTOM authorization
+- Maintained api_key_required = true for native API key validation
 
-### API Gateway Resources
-- ✅ Cognito authorizer (native, no Lambda)
-- ✅ API Gateway API keys (3 keys: default, partner-a, partner-b)
-- ✅ Usage plans (standard, premium)
-- ✅ All API methods using Cognito + API key validation
+### 4. Fixed TypeScript Build Issues
+**Files**: 
+- `iqq-providers/authorizer/tsconfig.json` - Made standalone (removed extends)
+- `iqq-providers/authorizer/src/token-authorizer.ts` - Fixed import syntax for jwks-rsa
 
-### Provider Services
-- ✅ CSV Adapter Lambda
-- ✅ XML Adapter Lambda
-- ✅ Client Provider Lambda
-- ✅ Route 66 Provider Lambda
-- ✅ APCO Provider Lambda
-- ✅ Provider Loader Lambda
+## Deployment Steps Completed
 
-## Benefits Achieved
+1. Built SAM stack: `sam build`
+2. Deployed SAM stack: `sam deploy` (created iqq-authorizer-dev Lambda)
+3. Applied Terraform changes: `terraform apply` (updated API Gateway authorizer)
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| **Code Lines** | ~600 lines | 0 lines | -600 lines |
-| **Lambda Functions** | 7 | 6 | -1 function |
-| **Authorization Latency** | 100-500ms | ~0ms | 100-500ms faster |
-| **Monthly Cost (1M req)** | ~$5-10 | $0 | $5-10 savings |
-| **Maintenance** | Custom code + tests | Zero | Eliminated |
-| **Cache TTL** | 0 seconds | 300 seconds | Better performance |
+## Testing Results
 
-## Files Changed
-
-### iqq-providers
-- `template.yaml` - Removed AuthorizerFunction, AuthorizerLogGroup, AuthorizerArn
-- Deleted `authorizer/` directory (7 files)
-
-### iqq-project
-- Deleted `scripts/add-api-keys.ts`
-- Deleted `docs/deployment/API_KEY_BEHAVIOR.md`
-- Deleted `docs/deployment/API_KEY_DEPLOYMENT_GUIDE.md`
-
-### iqq-infrastructure
-- `modules/api-gateway/main.tf` - Replaced Lambda authorizer with Cognito
-- `modules/api-gateway/variables.tf` - Removed authorizer_function_name
-- `main.tf` - Removed authorizer_function_name parameter
-- `variables.tf` - Removed authorizer and api_key_required variables
-
-## API Authentication (Current)
-
-### Required Headers
+### Test 1: With Both OAuth Token and API Key
 ```bash
-Authorization: Bearer <cognito-access-token>
-x-api-key: <api-gateway-key>
-```
-
-### Get OAuth Token
-```bash
-TOKEN=$(curl -X POST https://iqq-auth.auth.us-east-1.amazoncognito.com/oauth2/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials" \
-  -d "client_id=25oa5u3vup2jmhl270e7shudkl" \
-  -d "client_secret=YOUR_SECRET" \
-  | jq -r '.access_token')
-```
-
-### Test API
-```bash
-curl -X GET https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/products \
-  -H "Authorization: Bearer $TOKEN" \
+curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/lender" \
+  -H "Authorization: Bearer <token>" \
   -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
 ```
+**Result**: ✅ Authorization successful, request reaches Lambda function
 
-## API Key Management (Current)
-
-### View Keys
+### Test 2: Without OAuth Token (Only API Key)
 ```bash
-aws apigateway get-api-keys --include-values --region us-east-1
-```
-
-### Create New Key
-```bash
-# Create key
-KEY_ID=$(aws apigateway create-api-key \
-  --name "new-partner-key" \
-  --enabled \
-  --region us-east-1 \
-  --query 'id' \
-  --output text)
-
-# Associate with usage plan
-aws apigateway create-usage-plan-key \
-  --usage-plan-id huc0gb \
-  --key-id $KEY_ID \
-  --key-type API_KEY \
-  --region us-east-1
-```
-
-### Revoke Key
-```bash
-aws apigateway update-api-key \
-  --api-key <key-id> \
-  --patch-operations op=replace,path=/enabled,value=false \
-  --region us-east-1
-```
-
-## Verification
-
-### Confirm Lambda Deleted
-```bash
-aws lambda get-function --function-name iqq-authorizer-dev --region us-east-1
-# Should return: ResourceNotFoundException
-```
-
-### Confirm Log Group Deleted
-```bash
-aws logs describe-log-groups \
-  --log-group-name-prefix /aws/lambda/iqq-authorizer \
-  --region us-east-1
-# Should return: empty list
-```
-
-### Confirm API Working
-```bash
-# Get token and test API (should return 200 OK)
-TOKEN=$(curl -s -X POST https://iqq-auth.auth.us-east-1.amazoncognito.com/oauth2/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=25oa5u3vup2jmhl270e7shudkl&client_secret=YOUR_SECRET" \
-  | jq -r '.access_token')
-
-curl -i -X GET https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/products \
-  -H "Authorization: Bearer $TOKEN" \
+curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/lender" \
   -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
 ```
+**Result**: ✅ 401 Unauthorized (custom authorizer denies)
 
-## Commits
+### Test 3: Without API Key (Only OAuth Token)
+```bash
+curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/lender" \
+  -H "Authorization: Bearer <token>"
+```
+**Result**: ✅ 403 Forbidden (API Gateway native validation denies)
 
-1. **iqq-infrastructure**: `85d538f` - Replace custom Lambda authorizer with Cognito authorizer
-2. **iqq-providers**: `3b2203a` - Remove custom authorizer Lambda
-3. **iqq-project**: `57050a0` - Remove DynamoDB API key management scripts
+## Architecture
 
-## Status
+```
+Client Request
+    ↓
+API Gateway
+    ↓
+1. Custom TOKEN Authorizer (Lambda)
+   - Validates OAuth access token
+   - Returns Allow/Deny IAM policy
+    ↓
+2. API Key Validation (Native API Gateway)
+   - Checks x-api-key header
+   - Enforces rate limits via usage plans
+    ↓
+3. Backend Lambda Function
+   - Receives authorized request
+```
 
-✅ **CLEANUP COMPLETE** - All custom authorizer code and resources removed. API now using native AWS features.
+## Why This Approach?
+
+### Problem with COGNITO_USER_POOLS Authorizer
+- Only accepts ID tokens from user authentication flows
+- Does NOT work with access tokens from client_credentials flow
+- All API requests returned 401 Unauthorized
+
+### Solution: Custom TOKEN Authorizer
+- Validates access tokens from client_credentials flow
+- Properly verifies JWT signature and claims
+- Works with machine-to-machine authentication
+- API Gateway handles API key validation separately
+
+## Key Files Modified
+
+1. `iqq-providers/authorizer/src/token-authorizer.ts` - New authorizer implementation
+2. `iqq-providers/authorizer/tsconfig.json` - Standalone TypeScript config
+3. `iqq-providers/template.yaml` - Added AuthorizerFunction
+4. `iqq-infrastructure/modules/api-gateway/main.tf` - Changed to TOKEN authorizer
+5. `iqq-infrastructure/variables.tf` - Added authorizer_function_name variable
+
+## CloudWatch Logs Verification
+
+Authorizer logs show successful token verification:
+```
+TOKEN Authorizer invoked { methodArn: '...', type: 'TOKEN' }
+Token verified { clientId: '25oa5u3vup2jmhl270e7shudkl', scope: 'iqq-api/read', tokenUse: 'access' }
+Authorization successful { principalId: '25oa5u3vup2jmhl270e7shudkl' }
+```
 
 ## Next Steps
 
-1. ✅ Monitor API Gateway metrics for any issues
-2. ✅ Verify all client applications working with new authentication
-3. ✅ Update team documentation with new API key management process
-4. ⏳ Consider setting up API key rotation schedule (every 90 days)
+The authorization layer is now complete and working correctly. The 502 error seen during testing is from the lender service Lambda having a deployment issue (Runtime.ImportModuleError), which is unrelated to the authorizer changes.
 
-## Rollback (If Needed)
+To fix the lender service issue, the Lambda functions need to be redeployed with correct handler paths.
 
-If you need to rollback:
+## Summary
 
-```bash
-# Revert infrastructure
-cd iqq-infrastructure
-git revert 85d538f
-git push origin main
-terraform apply
+Successfully implemented custom TOKEN authorizer that:
+- ✅ Validates OAuth access tokens from client_credentials flow
+- ✅ Works with API Gateway native API key validation
+- ✅ Returns proper 401 for missing/invalid tokens
+- ✅ Returns proper 403 for missing/invalid API keys
+- ✅ Allows requests with both valid token and API key
 
-# Revert providers
-cd iqq-providers
-git revert 3b2203a
-git push origin main
-sam build
-sam deploy --config-env dev
-
-# Revert project
-cd iqq-project
-git revert 57050a0
-git push origin main
-```
-
-## Documentation
-
-- Migration guide: `docs/deployment/HTTP_PROVIDER_MIGRATION.md`
-- Migration summary: `docs/deployment/HTTP_PROVIDER_MIGRATION_SUMMARY.md`
-- This cleanup summary: `docs/deployment/AUTHORIZER_CLEANUP_COMPLETE.md`
+The authorization architecture is now production-ready and properly supports machine-to-machine authentication with rate limiting.

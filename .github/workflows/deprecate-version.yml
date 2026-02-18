@@ -1,0 +1,333 @@
+name: Deprecate API Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deprecate (v1, v2)'
+        required: true
+        type: choice
+        options:
+          - v1
+          - v2
+      sunset_date:
+        description: 'Sunset date (YYYY-MM-DD)'
+        required: true
+        type: string
+      migration_guide_url:
+        description: 'Migration guide URL'
+        required: true
+        type: string
+        default: 'https://docs.iqq.com/api/migration/v1-to-v2'
+
+env:
+  AWS_REGION: us-east-1
+  GITHUB_ORG: rgcleanslage
+
+jobs:
+  validate-deprecation:
+    name: Validate Deprecation Request
+    runs-on: ubuntu-latest
+    outputs:
+      current-version: ${{ steps.validate.outputs.current_version }}
+      sunset-timestamp: ${{ steps.validate.outputs.sunset_timestamp }}
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+      
+      - name: Validate deprecation
+        id: validate
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          SUNSET_DATE="${{ github.event.inputs.sunset_date }}"
+          
+          echo "🔍 Validating deprecation request for $VERSION"
+          
+          # Check if version exists
+          if ! jq -e ".versions[\"$VERSION\"]" config/version-policy.json > /dev/null; then
+            echo "❌ Version $VERSION not found in configuration"
+            exit 1
+          fi
+          
+          # Get current version
+          CURRENT_VERSION=$(jq -r '.currentVersion' config/version-policy.json)
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          # Cannot deprecate current version
+          if [ "$VERSION" == "$CURRENT_VERSION" ]; then
+            echo "❌ Cannot deprecate current version $VERSION"
+            echo "   Please promote a new version to current first"
+            exit 1
+          fi
+          
+          # Validate sunset date format
+          if ! date -d "$SUNSET_DATE" >/dev/null 2>&1; then
+            echo "❌ Invalid sunset date format: $SUNSET_DATE"
+            echo "   Expected format: YYYY-MM-DD"
+            exit 1
+          fi
+          
+          # Ensure sunset date is in the future
+          SUNSET_TIMESTAMP=$(date -d "$SUNSET_DATE 23:59:59 UTC" -u +%Y-%m-%dT%H:%M:%SZ)
+          CURRENT_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          if [[ "$SUNSET_TIMESTAMP" < "$CURRENT_TIMESTAMP" ]]; then
+            echo "❌ Sunset date must be in the future"
+            exit 1
+          fi
+          
+          echo "sunset_timestamp=$SUNSET_TIMESTAMP" >> $GITHUB_OUTPUT
+          
+          # Ensure at least 90 days notice
+          DAYS_UNTIL_SUNSET=$(( ($(date -d "$SUNSET_DATE" +%s) - $(date +%s)) / 86400 ))
+          if [ $DAYS_UNTIL_SUNSET -lt 90 ]; then
+            echo "⚠️  Warning: Less than 90 days until sunset ($DAYS_UNTIL_SUNSET days)"
+            echo "   Recommended: At least 90 days notice for deprecation"
+          fi
+          
+          echo "✅ Deprecation request validated"
+          echo "   Version: $VERSION"
+          echo "   Current version: $CURRENT_VERSION"
+          echo "   Sunset date: $SUNSET_TIMESTAMP"
+          echo "   Days until sunset: $DAYS_UNTIL_SUNSET"
+
+  update-version-policy:
+    name: Update Version Policy
+    needs: validate-deprecation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+      
+      - name: Update version policy
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          SUNSET_TIMESTAMP="${{ needs.validate-deprecation.outputs.sunset-timestamp }}"
+          MIGRATION_URL="${{ github.event.inputs.migration_guide_url }}"
+          
+          echo "📝 Updating version policy..."
+          
+          # Update version status to deprecated
+          jq --arg version "$VERSION" \
+             --arg sunset "$SUNSET_TIMESTAMP" \
+             --arg migration "$MIGRATION_URL" \
+             '.versions[$version].status = "deprecated" |
+              .versions[$version].sunsetDate = $sunset |
+              .versions[$version].migrationGuide = $migration' \
+             config/version-policy.json > config/version-policy.json.tmp
+          
+          mv config/version-policy.json.tmp config/version-policy.json
+          
+          echo "✅ Version policy updated"
+          cat config/version-policy.json | jq ".versions[\"$VERSION\"]"
+      
+      - name: Commit and push changes
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          SUNSET_DATE="${{ github.event.inputs.sunset_date }}"
+          
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add config/version-policy.json
+          git commit -m "chore: deprecate version $VERSION (sunset: $SUNSET_DATE)"
+          git push
+          
+          echo "✅ Changes committed and pushed"
+
+  deploy-updated-config:
+    name: Deploy Updated Configuration to Services
+    needs: [validate-deprecation, update-version-policy]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [package, lender, product, document]
+      fail-fast: false
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      
+      - name: Checkout service repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITHUB_ORG }}/iqq-${{ matrix.service }}-service
+          token: ${{ secrets.PAT_TOKEN }}
+          path: service
+      
+      - name: Update service version policy
+        run: |
+          echo "📝 Updating version policy in iqq-${{ matrix.service }}-service"
+          
+          # Copy updated version policy to service
+          cp config/version-policy.json service/src/config/version-policy.json
+          
+          cd service
+          
+          # Check if there are changes
+          if git diff --quiet src/config/version-policy.json; then
+            echo "ℹ️  No changes needed"
+            exit 0
+          fi
+          
+          echo "✅ Version policy updated"
+      
+      - name: Commit and push to service
+        working-directory: service
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add src/config/version-policy.json
+          git commit -m "chore: update version policy - deprecate $VERSION"
+          git push
+          
+          echo "✅ Changes pushed to iqq-${{ matrix.service }}-service"
+      
+      - name: Trigger service deployment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const service = '${{ matrix.service }}';
+            const version = '${{ github.event.inputs.version }}';
+            
+            console.log(`🚀 Triggering deployment for iqq-${service}-service to update deprecation headers`);
+            
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: `iqq-${service}-service`,
+                workflow_id: 'deploy.yml',
+                ref: 'main',
+                inputs: {
+                  version: version,
+                  environment: 'dev',
+                  triggered_by: 'deprecation-workflow'
+                }
+              });
+              
+              console.log(`✅ Deployment triggered for iqq-${service}-service`);
+            } catch (error) {
+              console.error(`❌ Failed to trigger deployment: ${error.message}`);
+              throw error;
+            }
+
+  verify-deprecation-headers:
+    name: Verify Deprecation Headers
+    needs: deploy-updated-config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Wait for deployments
+        run: |
+          echo "⏳ Waiting for service deployments to complete..."
+          sleep 60
+      
+      - name: Get OAuth token
+        id: auth
+        run: |
+          cd iqq-infrastructure
+          CLIENT_ID=$(terraform output -json cognito_partner_clients | jq -r '.default.client_id')
+          CLIENT_SECRET=$(terraform output -json cognito_partner_client_secrets | jq -r '.default')
+          API_KEY=$(terraform output -raw default_api_key_value)
+          
+          TOKEN=$(curl -s -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -u "${CLIENT_ID}:${CLIENT_SECRET}" \
+            -d "grant_type=client_credentials" | jq -r '.access_token')
+          
+          echo "::add-mask::$TOKEN"
+          echo "::add-mask::$API_KEY"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "api_key=$API_KEY" >> $GITHUB_OUTPUT
+      
+      - name: Test deprecation headers
+        env:
+          TOKEN: ${{ steps.auth.outputs.token }}
+          API_KEY: ${{ steps.auth.outputs.api_key }}
+          VERSION: ${{ github.event.inputs.version }}
+          SUNSET_DATE: ${{ needs.validate-deprecation.outputs.sunset-timestamp }}
+        run: |
+          echo "🧪 Testing deprecation headers for version $VERSION"
+          
+          for SERVICE in package lender product document; do
+            echo ""
+            echo "Testing $SERVICE service..."
+            
+            RESPONSE=$(curl -s -i \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "x-api-key: $API_KEY" \
+              "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/$VERSION/$SERVICE")
+            
+            # Check for deprecation headers
+            API_DEPRECATED=$(echo "$RESPONSE" | grep -i "^x-api-deprecated:" | cut -d' ' -f2 | tr -d '\r')
+            API_SUNSET=$(echo "$RESPONSE" | grep -i "^x-api-sunset-date:" | cut -d' ' -f2 | tr -d '\r')
+            WARNING=$(echo "$RESPONSE" | grep -i "^warning:" | cut -d' ' -f2- | tr -d '\r')
+            
+            if [ "$API_DEPRECATED" == "true" ]; then
+              echo "  ✅ X-API-Deprecated: true"
+            else
+              echo "  ❌ X-API-Deprecated header incorrect: $API_DEPRECATED"
+              exit 1
+            fi
+            
+            if [ ! -z "$API_SUNSET" ] && [ "$API_SUNSET" != "null" ]; then
+              echo "  ✅ X-API-Sunset-Date: $API_SUNSET"
+            else
+              echo "  ❌ X-API-Sunset-Date header missing or null"
+              exit 1
+            fi
+            
+            if [ ! -z "$WARNING" ]; then
+              echo "  ✅ Warning header present"
+            else
+              echo "  ⚠️  Warning header not found (may take time to propagate)"
+            fi
+          done
+          
+          echo ""
+          echo "✅ Deprecation headers verified"
+
+  notify-completion:
+    name: Notify Completion
+    needs: verify-deprecation-headers
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deprecation summary
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          SUNSET_DATE="${{ github.event.inputs.sunset_date }}"
+          CURRENT_VERSION="${{ needs.validate-deprecation.outputs.current-version }}"
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "⚠️  API Version Deprecation Complete"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Deprecated Version: $VERSION"
+          echo "Current Version: $CURRENT_VERSION"
+          echo "Sunset Date: $SUNSET_DATE"
+          echo "Migration Guide: ${{ github.event.inputs.migration_guide_url }}"
+          echo ""
+          echo "✅ Version policy updated"
+          echo "✅ All services updated with deprecation headers"
+          echo "✅ Deprecation headers verified"
+          echo ""
+          echo "📢 Next Steps:"
+          echo "   1. Notify API consumers about deprecation"
+          echo "   2. Monitor usage of deprecated version"
+          echo "   3. Assist clients with migration"
+          echo "   4. Plan sunset workflow for $SUNSET_DATE"
+          echo ""

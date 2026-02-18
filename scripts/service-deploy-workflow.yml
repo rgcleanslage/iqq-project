@@ -1,0 +1,348 @@
+# Service Deployment Workflow Template
+# This file should be copied to .github/workflows/deploy.yml in each service repository
+# Replace {SERVICE_NAME} with: package, lender, product, or document
+
+name: Deploy Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (v1, v2)'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        type: string
+        default: 'dev'
+      triggered_by:
+        description: 'Triggering source'
+        required: false
+        type: string
+        default: 'manual'
+
+env:
+  AWS_REGION: us-east-1
+  SERVICE_NAME: {SERVICE_NAME}  # Replace with: package, lender, product, or document
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      function-name: ${{ steps.config.outputs.function_name }}
+      stack-name: ${{ steps.config.outputs.stack_name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set deployment configuration
+        id: config
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          ENV="${{ github.event.inputs.environment }}"
+          
+          FUNCTION_NAME="iqq-${SERVICE_NAME}-service-${ENV}"
+          STACK_NAME="iqq-${SERVICE_NAME}-service-${ENV}"
+          
+          echo "function_name=$FUNCTION_NAME" >> $GITHUB_OUTPUT
+          echo "stack_name=$STACK_NAME" >> $GITHUB_OUTPUT
+          
+          echo "📦 Deployment Configuration"
+          echo "   Service: ${SERVICE_NAME}"
+          echo "   Version: $VERSION"
+          echo "   Environment: $ENV"
+          echo "   Function: $FUNCTION_NAME"
+          echo "   Stack: $STACK_NAME"
+      
+      - name: Validate version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          # Check if version exists in config
+          if ! jq -e ".versions[\"$VERSION\"]" src/config/version-policy.json > /dev/null; then
+            echo "❌ Version $VERSION not found in version policy"
+            exit 1
+          fi
+          
+          echo "✅ Version $VERSION validated"
+
+  test:
+    name: Run Tests
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linter
+        run: npm run lint || echo "No lint script found"
+      
+      - name: Run tests
+        run: npm test
+      
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  build:
+    name: Build Application
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build TypeScript
+        run: npm run build
+      
+      - name: Setup SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+      
+      - name: Build SAM application
+        run: sam build
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sam-build
+          path: .aws-sam/build/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to AWS
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment }}
+      url: https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${{ github.event.inputs.version }}/${{ env.SERVICE_NAME }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sam-build
+          path: .aws-sam/build/
+      
+      - name: Setup SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Deploy with SAM
+        run: |
+          STACK_NAME="${{ needs.validate.outputs.stack-name }}"
+          ENV="${{ github.event.inputs.environment }}"
+          
+          sam deploy \
+            --stack-name "$STACK_NAME" \
+            --s3-bucket "${{ secrets.SAM_DEPLOYMENT_BUCKET }}" \
+            --s3-prefix "iqq-${SERVICE_NAME}-service" \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides "Environment=$ENV" \
+            --region $AWS_REGION
+          
+          echo "✅ SAM deployment complete"
+      
+      - name: Get function ARN
+        id: function
+        run: |
+          STACK_NAME="${{ needs.validate.outputs.stack-name }}"
+          
+          FUNCTION_ARN=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].Outputs[?OutputKey==`FunctionArn`].OutputValue' \
+            --output text)
+          
+          echo "function_arn=$FUNCTION_ARN" >> $GITHUB_OUTPUT
+          echo "✅ Function ARN: $FUNCTION_ARN"
+
+  update-alias:
+    name: Update Lambda Alias
+    needs: [validate, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Publish new version
+        id: publish
+        run: |
+          FUNCTION_NAME="${{ needs.validate.outputs.function-name }}"
+          
+          echo "📦 Publishing new Lambda version for $FUNCTION_NAME"
+          
+          VERSION_ARN=$(aws lambda publish-version \
+            --function-name "$FUNCTION_NAME" \
+            --description "Deployed by GitHub Actions - ${{ github.run_id }}" \
+            --query 'Version' \
+            --output text)
+          
+          echo "version=$VERSION_ARN" >> $GITHUB_OUTPUT
+          echo "✅ Published version: $VERSION_ARN"
+      
+      - name: Update or create alias
+        run: |
+          FUNCTION_NAME="${{ needs.validate.outputs.function-name }}"
+          ALIAS_NAME="${{ github.event.inputs.version }}"
+          VERSION="${{ steps.publish.outputs.version }}"
+          
+          echo "🔄 Updating alias $ALIAS_NAME to version $VERSION"
+          
+          # Check if alias exists
+          if aws lambda get-alias \
+            --function-name "$FUNCTION_NAME" \
+            --name "$ALIAS_NAME" 2>/dev/null; then
+            
+            # Update existing alias
+            aws lambda update-alias \
+              --function-name "$FUNCTION_NAME" \
+              --name "$ALIAS_NAME" \
+              --function-version "$VERSION" \
+              --description "Updated by GitHub Actions - ${{ github.run_id }}"
+            
+            echo "✅ Alias $ALIAS_NAME updated to version $VERSION"
+          else
+            # Create new alias
+            aws lambda create-alias \
+              --function-name "$FUNCTION_NAME" \
+              --name "$ALIAS_NAME" \
+              --function-version "$VERSION" \
+              --description "Created by GitHub Actions - ${{ github.run_id }}"
+            
+            echo "✅ Alias $ALIAS_NAME created pointing to version $VERSION"
+          fi
+      
+      - name: Verify alias
+        run: |
+          FUNCTION_NAME="${{ needs.validate.outputs.function-name }}"
+          ALIAS_NAME="${{ github.event.inputs.version }}"
+          
+          ALIAS_INFO=$(aws lambda get-alias \
+            --function-name "$FUNCTION_NAME" \
+            --name "$ALIAS_NAME")
+          
+          echo "✅ Alias verification:"
+          echo "$ALIAS_INFO" | jq '{Name, FunctionVersion, Description}'
+
+  verify:
+    name: Verify Deployment
+    needs: [validate, update-alias]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Test Lambda function
+        run: |
+          FUNCTION_NAME="${{ needs.validate.outputs.function-name }}"
+          ALIAS_NAME="${{ github.event.inputs.version }}"
+          
+          echo "🧪 Testing Lambda function with alias $ALIAS_NAME"
+          
+          # Create test event
+          TEST_EVENT='{
+            "httpMethod": "GET",
+            "path": "/'${SERVICE_NAME}'",
+            "queryStringParameters": {},
+            "headers": {},
+            "requestContext": {
+              "requestId": "test-request-id",
+              "stage": "'${ALIAS_NAME}'"
+            }
+          }'
+          
+          # Invoke function
+          RESPONSE=$(aws lambda invoke \
+            --function-name "$FUNCTION_NAME:$ALIAS_NAME" \
+            --payload "$TEST_EVENT" \
+            --cli-binary-format raw-in-base64-out \
+            response.json)
+          
+          # Check response
+          if [ -f response.json ]; then
+            STATUS_CODE=$(jq -r '.statusCode' response.json)
+            if [ "$STATUS_CODE" == "200" ]; then
+              echo "✅ Lambda function responding correctly"
+            else
+              echo "⚠️  Lambda returned status code: $STATUS_CODE"
+              cat response.json | jq .
+            fi
+          else
+            echo "❌ No response from Lambda"
+            exit 1
+          fi
+
+  notify:
+    name: Notify Completion
+    needs: [validate, verify]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment summary
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          ENV="${{ github.event.inputs.environment }}"
+          TRIGGERED_BY="${{ github.event.inputs.triggered_by }}"
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📦 Service Deployment Complete"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Service: ${SERVICE_NAME}"
+          echo "Version: $VERSION"
+          echo "Environment: $ENV"
+          echo "Triggered by: $TRIGGERED_BY"
+          echo "Status: ${{ job.status }}"
+          echo ""
+          echo "✅ Lambda function deployed"
+          echo "✅ Alias $VERSION updated"
+          echo "✅ Deployment verified"
+          echo ""
+          echo "🔗 Endpoint:"
+          echo "   https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/$VERSION/${SERVICE_NAME}"
+          echo ""

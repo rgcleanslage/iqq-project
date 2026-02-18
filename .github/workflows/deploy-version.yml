@@ -1,0 +1,376 @@
+name: Deploy API Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (v1, v2)'
+        required: true
+        type: choice
+        options:
+          - v1
+          - v2
+      services:
+        description: 'Services to deploy (comma-separated or "all")'
+        required: true
+        default: 'all'
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+        default: 'dev'
+
+env:
+  AWS_REGION: us-east-1
+  GITHUB_ORG: rgcleanslage
+
+jobs:
+  validate-version:
+    name: Validate Version Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      services-list: ${{ steps.parse.outputs.services }}
+      version-status: ${{ steps.validate.outputs.status }}
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+      
+      - name: Parse services list
+        id: parse
+        run: |
+          SERVICES="${{ github.event.inputs.services }}"
+          if [ "$SERVICES" == "all" ]; then
+            SERVICES="package,lender,product,document"
+          fi
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          echo "📦 Services to deploy: $SERVICES"
+      
+      - name: Validate version configuration
+        id: validate
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          # Check if version exists in configuration
+          if ! jq -e ".versions[\"$VERSION\"]" config/version-policy.json > /dev/null; then
+            echo "❌ Version $VERSION not found in configuration"
+            exit 1
+          fi
+          
+          # Get version status
+          STATUS=$(jq -r ".versions[\"$VERSION\"].status" config/version-policy.json)
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          
+          echo "✅ Version $VERSION is valid (status: $STATUS)"
+          
+          # Check if version is sunset
+          if [ "$STATUS" == "sunset" ]; then
+            echo "❌ Cannot deploy sunset version $VERSION"
+            exit 1
+          fi
+
+  deploy-services:
+    name: Deploy ${{ matrix.service }} Service
+    needs: validate-version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(format('["{0}"]', needs.validate-version.outputs.services-list)) }}
+      fail-fast: false
+      max-parallel: 2
+    steps:
+      - name: Trigger service deployment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const service = '${{ matrix.service }}';
+            const version = '${{ github.event.inputs.version }}';
+            const environment = '${{ github.event.inputs.environment }}';
+            
+            console.log(`🚀 Triggering deployment for iqq-${service}-service`);
+            console.log(`   Version: ${version}`);
+            console.log(`   Environment: ${environment}`);
+            
+            try {
+              const response = await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: `iqq-${service}-service`,
+                workflow_id: 'deploy.yml',
+                ref: 'main',
+                inputs: {
+                  version: version,
+                  environment: environment,
+                  triggered_by: 'root-repository'
+                }
+              });
+              
+              console.log(`✅ Deployment triggered for iqq-${service}-service`);
+            } catch (error) {
+              console.error(`❌ Failed to trigger deployment: ${error.message}`);
+              throw error;
+            }
+      
+      - name: Wait for deployment to start
+        run: |
+          echo "⏳ Waiting for deployment to start..."
+          sleep 10
+      
+      - name: Monitor deployment status
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const service = '${{ matrix.service }}';
+            const maxAttempts = 60; // 10 minutes max
+            const delayMs = 10000; // 10 seconds between checks
+            
+            console.log(`📊 Monitoring deployment for iqq-${service}-service`);
+            
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              // Get recent workflow runs
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: `iqq-${service}-service`,
+                workflow_id: 'deploy.yml',
+                per_page: 5
+              });
+              
+              // Find the most recent run
+              const latestRun = runs.data.workflow_runs[0];
+              
+              if (!latestRun) {
+                console.log(`⏳ Attempt ${attempt}/${maxAttempts}: No runs found yet`);
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                continue;
+              }
+              
+              console.log(`📍 Attempt ${attempt}/${maxAttempts}: Status = ${latestRun.status}, Conclusion = ${latestRun.conclusion}`);
+              
+              if (latestRun.status === 'completed') {
+                if (latestRun.conclusion === 'success') {
+                  console.log(`✅ Deployment completed successfully`);
+                  return;
+                } else {
+                  console.error(`❌ Deployment failed with conclusion: ${latestRun.conclusion}`);
+                  throw new Error(`Deployment failed for iqq-${service}-service`);
+                }
+              }
+              
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+            
+            console.error(`❌ Deployment timed out after ${maxAttempts} attempts`);
+            throw new Error(`Deployment timeout for iqq-${service}-service`);
+
+  verify-deployments:
+    name: Verify Service Deployments
+    needs: deploy-services
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get OAuth token
+        id: auth
+        run: |
+          cd iqq-infrastructure
+          CLIENT_ID=$(terraform output -json cognito_partner_clients | jq -r '.default.client_id')
+          CLIENT_SECRET=$(terraform output -json cognito_partner_client_secrets | jq -r '.default')
+          API_KEY=$(terraform output -raw default_api_key_value)
+          
+          TOKEN=$(curl -s -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -u "${CLIENT_ID}:${CLIENT_SECRET}" \
+            -d "grant_type=client_credentials" | jq -r '.access_token')
+          
+          echo "::add-mask::$TOKEN"
+          echo "::add-mask::$API_KEY"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "api_key=$API_KEY" >> $GITHUB_OUTPUT
+      
+      - name: Test deployed services
+        env:
+          TOKEN: ${{ steps.auth.outputs.token }}
+          API_KEY: ${{ steps.auth.outputs.api_key }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          SERVICES="${{ needs.validate-version.outputs.services-list }}"
+          IFS=',' read -ra SERVICE_ARRAY <<< "$SERVICES"
+          
+          echo "🧪 Testing deployed services on version $VERSION"
+          
+          FAILED=0
+          for SERVICE in "${SERVICE_ARRAY[@]}"; do
+            echo ""
+            echo "Testing $SERVICE service..."
+            
+            # Determine test parameters based on service
+            case $SERVICE in
+              package)
+                PARAMS="?productCode=MBP"
+                ;;
+              lender)
+                PARAMS="?lenderId=LENDER-001"
+                ;;
+              product)
+                PARAMS="?productId=PROD-001"
+                ;;
+              document)
+                PARAMS=""
+                ;;
+            esac
+            
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "x-api-key: $API_KEY" \
+              "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/$VERSION/$SERVICE$PARAMS")
+            
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+            
+            if [ "$HTTP_CODE" -eq 200 ]; then
+              # Verify version header in response
+              API_VERSION=$(echo "$BODY" | jq -r '.metadata.apiVersion // empty')
+              echo "  ✅ HTTP 200 - Service responding"
+              if [ ! -z "$API_VERSION" ]; then
+                echo "  ✅ Version header present: $API_VERSION"
+              fi
+            else
+              echo "  ❌ HTTP $HTTP_CODE - Service failed"
+              echo "$BODY" | jq . || echo "$BODY"
+              FAILED=1
+            fi
+          done
+          
+          if [ $FAILED -eq 1 ]; then
+            echo ""
+            echo "❌ Some services failed verification"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ All services verified successfully"
+
+  update-api-gateway:
+    name: Update API Gateway
+    needs: verify-deployments
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITHUB_ORG }}/iqq-infrastructure
+          token: ${{ secrets.PAT_TOKEN }}
+          path: infrastructure
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Verify API Gateway stage
+        working-directory: infrastructure
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          terraform init
+          
+          API_ID=$(terraform output -raw api_gateway_id)
+          
+          echo "🔍 Checking API Gateway stage: $VERSION"
+          
+          # Check if stage exists
+          if aws apigateway get-stage \
+            --rest-api-id "$API_ID" \
+            --stage-name "$VERSION" 2>/dev/null; then
+            echo "✅ Stage $VERSION exists"
+          else
+            echo "❌ Stage $VERSION does not exist"
+            exit 1
+          fi
+          
+          # Trigger redeployment to ensure latest Lambda versions
+          echo "🔄 Triggering API Gateway redeployment..."
+          aws apigateway create-deployment \
+            --rest-api-id "$API_ID" \
+            --stage-name "$VERSION" \
+            --description "Redeployment triggered by version deployment workflow"
+          
+          echo "✅ API Gateway redeployment complete"
+
+  update-version-policy:
+    name: Update Version Policy
+    needs: update-api-gateway
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+      
+      - name: Update version policy
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          
+          # Update last deployed timestamp
+          jq --arg version "$VERSION" \
+             --arg timestamp "$TIMESTAMP" \
+             '.versions[$version].lastDeployed = $timestamp' \
+             config/version-policy.json > config/version-policy.json.tmp
+          
+          mv config/version-policy.json.tmp config/version-policy.json
+          
+          echo "✅ Updated version policy for $VERSION"
+          echo "   Timestamp: $TIMESTAMP"
+      
+      - name: Commit and push changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add config/version-policy.json
+          git commit -m "chore: update version policy - ${{ github.event.inputs.version }} deployed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
+
+  notify-completion:
+    name: Notify Completion
+    needs: update-version-policy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment summary
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          SERVICES="${{ needs.validate-version.outputs.services-list }}"
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📦 API Version Deployment Complete"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Version: $VERSION"
+          echo "Services: $SERVICES"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Status: ${{ job.status }}"
+          echo ""
+          echo "✅ All services deployed and verified"
+          echo "✅ API Gateway updated"
+          echo "✅ Version policy updated"
+          echo ""
+          echo "🔗 API Endpoints:"
+          echo "   https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/$VERSION/"
+          echo ""

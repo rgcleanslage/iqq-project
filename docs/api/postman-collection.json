@@ -1,0 +1,354 @@
+{
+  "info": {
+    "name": "iQQ Insurance Quote API",
+    "description": "Complete API collection for iQQ Insurance Quote system including OAuth authentication",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-refresh OAuth token if expired",
+          "const tokenExpiry = pm.environment.get('tokenExpiry');",
+          "const now = Date.now();",
+          "",
+          "if (!tokenExpiry || now >= tokenExpiry) {",
+          "    const clientId = pm.environment.get('clientId');",
+          "    const clientSecret = pm.environment.get('clientSecret');",
+          "    const cognitoUrl = pm.environment.get('cognitoUrl');",
+          "    ",
+          "    const authString = btoa(`${clientId}:${clientSecret}`);",
+          "    ",
+          "    pm.sendRequest({",
+          "        url: `${cognitoUrl}/oauth2/token`,",
+          "        method: 'POST',",
+          "        header: {",
+          "            'Content-Type': 'application/x-www-form-urlencoded',",
+          "            'Authorization': `Basic ${authString}`",
+          "        },",
+          "        body: {",
+          "            mode: 'urlencoded',",
+          "            urlencoded: [",
+          "                { key: 'grant_type', value: 'client_credentials' },",
+          "                { key: 'scope', value: 'iqq-api/read' }",
+          "            ]",
+          "        }",
+          "    }, (err, response) => {",
+          "        if (err) {",
+          "            console.error('Error getting token:', err);",
+          "        } else {",
+          "            const jsonData = response.json();",
+          "            pm.environment.set('accessToken', jsonData.access_token);",
+          "            const expiryTime = now + ((jsonData.expires_in - 300) * 1000);",
+          "            pm.environment.set('tokenExpiry', expiryTime);",
+          "            console.log('Token refreshed successfully');",
+          "        }",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Get OAuth Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('accessToken', jsonData.access_token);",
+                  "    const expiryTime = Date.now() + ((jsonData.expires_in - 300) * 1000);",
+                  "    pm.environment.set('tokenExpiry', expiryTime);",
+                  "    console.log('Token saved to environment');",
+                  "    console.log('Token expires in: ' + jsonData.expires_in + ' seconds');",
+                  "} else {",
+                  "    console.error('Failed to get token. Status: ' + pm.response.code);",
+                  "    console.error('Response: ' + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{base64ClientCredentials}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "iqq-api/read",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{cognitoUrl}}/oauth2/token",
+              "host": ["{{cognitoUrl}}"],
+              "path": ["oauth2", "token"]
+            },
+            "description": "Get OAuth 2.0 access token using client credentials flow.\n\nIMPORTANT: Make sure to set base64ClientCredentials in your environment.\nIt should be Base64(clientId:clientSecret)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get OAuth Token (Alternative)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Encode credentials as Base64",
+                  "const clientId = pm.environment.get('clientId');",
+                  "const clientSecret = pm.environment.get('clientSecret');",
+                  "const credentials = clientId + ':' + clientSecret;",
+                  "const base64Credentials = btoa(credentials);",
+                  "pm.environment.set('base64ClientCredentials', base64Credentials);",
+                  "console.log('Credentials encoded');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.environment.set('accessToken', jsonData.access_token);",
+                  "    const expiryTime = Date.now() + ((jsonData.expires_in - 300) * 1000);",
+                  "    pm.environment.set('tokenExpiry', expiryTime);",
+                  "    console.log('Token saved to environment');",
+                  "    console.log('Token expires in: ' + jsonData.expires_in + ' seconds');",
+                  "} else {",
+                  "    console.error('Failed to get token. Status: ' + pm.response.code);",
+                  "    console.error('Response: ' + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{base64ClientCredentials}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "iqq-api/read",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{cognitoUrl}}/oauth2/token",
+              "host": ["{{cognitoUrl}}"],
+              "path": ["oauth2", "token"]
+            },
+            "description": "Alternative method that auto-encodes credentials in pre-request script"
+          },
+          "response": []
+        }
+      ],
+      "description": "OAuth 2.0 authentication endpoints"
+    },
+    {
+      "name": "Package",
+      "item": [
+        {
+          "name": "Get Package",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60 months",
+              "host": ["{{baseUrl}}"],
+              "path": ["package"],
+              "query": [
+                {
+                  "key": "productCode",
+                  "value": "MBP",
+                  "description": "Product code"
+                },
+                {
+                  "key": "coverageType",
+                  "value": "COMPREHENSIVE",
+                  "description": "Coverage type"
+                },
+                {
+                  "key": "vehicleValue",
+                  "value": "25000",
+                  "description": "Vehicle value in USD"
+                },
+                {
+                  "key": "term",
+                  "value": "60 months",
+                  "description": "Coverage term"
+                }
+              ]
+            },
+            "description": "Get multi-provider quote package with aggregated pricing"
+          },
+          "response": []
+        }
+      ],
+      "description": "Package service endpoints"
+    },
+    {
+      "name": "Lender",
+      "item": [
+        {
+          "name": "Get Lender",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/lender",
+              "host": ["{{baseUrl}}"],
+              "path": ["lender"]
+            },
+            "description": "Get lender information including contact details and ratings"
+          },
+          "response": []
+        }
+      ],
+      "description": "Lender service endpoints"
+    },
+    {
+      "name": "Product",
+      "item": [
+        {
+          "name": "Get Product",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/product",
+              "host": ["{{baseUrl}}"],
+              "path": ["product"]
+            },
+            "description": "Get product information including coverage details and available providers"
+          },
+          "response": []
+        }
+      ],
+      "description": "Product service endpoints"
+    },
+    {
+      "name": "Document",
+      "item": [
+        {
+          "name": "Get Document",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{apiKey}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/document",
+              "host": ["{{baseUrl}}"],
+              "path": ["document"]
+            },
+            "description": "Get document metadata and access information"
+          },
+          "response": []
+        }
+      ],
+      "description": "Document service endpoints"
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev",
+      "type": "string"
+    },
+    {
+      "key": "cognitoUrl",
+      "value": "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com",
+      "type": "string"
+    }
+  ]
+}
