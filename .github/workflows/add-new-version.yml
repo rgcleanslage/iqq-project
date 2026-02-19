@@ -373,9 +373,9 @@ jobs:
           EOF
           
           # Replace variables in the file
-          sed -i '' "s/\${VERSION}/${VERSION}/g" docs/api/migrations/MIGRATION_${PREV_VERSION}_TO_${VERSION}.md
-          sed -i '' "s/\${PREV_VERSION}/${PREV_VERSION}/g" docs/api/migrations/MIGRATION_${PREV_VERSION}_TO_${VERSION}.md
-          sed -i '' "s/\${DATE}/${DATE}/g" docs/api/migrations/MIGRATION_${PREV_VERSION}_TO_${VERSION}.md
+          sed -i "s/\${VERSION}/${VERSION}/g" docs/api/migrations/MIGRATION_${PREV_VERSION}_TO_${VERSION}.md
+          sed -i "s/\${PREV_VERSION}/${PREV_VERSION}/g" docs/api/migrations/MIGRATION_${PREV_VERSION}_TO_${VERSION}.md
+          sed -i "s/\${DATE}/${DATE}/g" docs/api/migrations/MIGRATION_${PREV_VERSION}_TO_${VERSION}.md
           
           echo "✅ Migration guide created: docs/api/migrations/MIGRATION_${PREV_VERSION}_TO_${VERSION}.md"
       
@@ -430,17 +430,26 @@ jobs:
           
           echo "📝 Updating workflow files to include $VERSION..."
           
-          # Update deploy-version.yml
-          sed -i '' "/options:/a\\
-          \ \ \ \ \ \ \ \ \ \ - $VERSION" .github/workflows/deploy-version.yml
+          # Update deploy-version.yml - add version to options list
+          awk -v version="$VERSION" '
+            /options:/ { print; getline; print; print "          - " version; next }
+            { print }
+          ' .github/workflows/deploy-version.yml > .github/workflows/deploy-version.yml.tmp
+          mv .github/workflows/deploy-version.yml.tmp .github/workflows/deploy-version.yml
           
           # Update deprecate-version.yml
-          sed -i '' "/options:/a\\
-          \ \ \ \ \ \ \ \ \ \ - $VERSION" .github/workflows/deprecate-version.yml
+          awk -v version="$VERSION" '
+            /options:/ { print; getline; print; print "          - " version; next }
+            { print }
+          ' .github/workflows/deprecate-version.yml > .github/workflows/deprecate-version.yml.tmp
+          mv .github/workflows/deprecate-version.yml.tmp .github/workflows/deprecate-version.yml
           
           # Update sunset-version.yml
-          sed -i '' "/options:/a\\
-          \ \ \ \ \ \ \ \ \ \ - $VERSION" .github/workflows/sunset-version.yml
+          awk -v version="$VERSION" '
+            /options:/ { print; getline; print; print "          - " version; next }
+            { print }
+          ' .github/workflows/sunset-version.yml > .github/workflows/sunset-version.yml.tmp
+          mv .github/workflows/sunset-version.yml.tmp .github/workflows/sunset-version.yml
           
           echo "✅ Workflow files updated"
       
