@@ -4,36 +4,38 @@
   "values": [
     {
       "key": "baseUrl",
-      "value": "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev",
+      "value": "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Base API URL (without version). Version is specified in request path (e.g., /v1/package)"
     },
     {
       "key": "cognitoUrl",
       "value": "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Cognito OAuth endpoint"
     },
     {
       "key": "clientId",
-      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "value": "YOUR_CLIENT_ID",
       "type": "default",
       "enabled": true,
-      "description": "Partner B Client - Maps to CLI003. Get from: terraform output -json cognito_partner_clients | jq -r '.partner_b.client_id'"
+      "description": "Partner B Client - Maps to CLI003. Get from Terraform or AWS Console"
     },
     {
       "key": "clientSecret",
-      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "value": "YOUR_CLIENT_SECRET",
       "type": "secret",
       "enabled": true,
-      "description": "Get from: terraform output -json cognito_partner_client_secrets | jq -r '.partner_b'"
+      "description": "Get from Terraform or AWS Console"
     },
     {
       "key": "apiKey",
-      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "value": "YOUR_API_KEY",
       "type": "default",
       "enabled": true,
-      "description": "Partner B API Key - Tagged with clientId=CLI003. Get from: terraform output -raw partner_b_api_key_value"
+      "description": "Partner B API Key - Tagged with clientId=CLI003. Get from Terraform or AWS Console"
     },
     {
       "key": "businessClientId",
@@ -46,15 +48,66 @@
       "key": "accessToken",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "OAuth access token (automatically set after authentication)"
     },
     {
       "key": "tokenExpiry",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Token expiry timestamp (automatically set)"
+    },
+    {
+      "key": "currentVersion",
+      "value": "v1",
+      "type": "default",
+      "enabled": true,
+      "description": "Current API version to use (v1, v2, v3, v4, v5, v6, v7, v8, v9)"
+    },
+    {
+      "key": "v1_response",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Stored v1 response for comparison"
+    },
+    {
+      "key": "v1_version",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "v1 API version metadata"
+    },
+    {
+      "key": "v1_status",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "v1 version status"
+    },
+    {
+      "key": "v9_response",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Stored v9 response for comparison"
+    },
+    {
+      "key": "v9_version",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "v9 API version metadata"
+    },
+    {
+      "key": "v9_status",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "v9 version status"
     }
   ],
   "_postman_variable_scope": "environment",
-  "description": "Partner B client environment with CLI003 preferences:\n- No preferences configured\n- Expected result: All 3 quotes (APCO, Client Direct, Route66)\n\nIMPORTANT: This is a template file. Copy to postman-environment-partner-b.json and fill in the credentials."
+  "description": "Partner B client environment with CLI003 preferences and versioning support.\n\nClient Preferences (CLI003):\n- No preferences configured\n- Expected result: All 3 quotes (APCO, Client Direct, Route66)\n\nAPI Versions:\n- v1: Stable (production)\n- v2-v9: Testing/planned\n\nSetup Instructions:\n1. Get credentials from Terraform:\n   terraform output -json cognito_partner_clients | jq -r '.partner_b.client_id'\n   terraform output -json cognito_partner_client_secrets | jq -r '.partner_b'\n   terraform output -raw partner_b_api_key_value\n2. Replace YOUR_CLIENT_ID, YOUR_CLIENT_SECRET, YOUR_API_KEY\n3. Run 'Get OAuth Token' to authenticate\n4. Test endpoints with different versions\n\nIMPORTANT: This is a template file. Copy and fill in your credentials."
 }

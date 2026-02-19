@@ -4,36 +4,38 @@
   "values": [
     {
       "key": "baseUrl",
-      "value": "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev",
+      "value": "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Base API URL (without version). Version is specified in request path (e.g., /v1/package)"
     },
     {
       "key": "cognitoUrl",
       "value": "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Cognito OAuth endpoint"
     },
     {
       "key": "clientId",
-      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "value": "YOUR_CLIENT_ID",
       "type": "default",
       "enabled": true,
-      "description": "Default Client - Maps to CLI001. Get from: terraform output -json cognito_partner_clients | jq -r '.default.client_id'"
+      "description": "Default Client - Maps to CLI001. Get from AWS Secrets Manager: iqq-dev-cognito-client-default"
     },
     {
       "key": "clientSecret",
-      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "value": "YOUR_CLIENT_SECRET",
       "type": "secret",
       "enabled": true,
-      "description": "Get from: terraform output -json cognito_partner_client_secrets | jq -r '.default'"
+      "description": "Get from AWS Secrets Manager: iqq-dev-cognito-client-default"
     },
     {
       "key": "apiKey",
-      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "value": "YOUR_API_KEY",
       "type": "default",
       "enabled": true,
-      "description": "Default API Key - Tagged with clientId=CLI001. Get from: terraform output -raw default_api_key_value"
+      "description": "Default API Key - Tagged with clientId=CLI001. Get from AWS Secrets Manager: iqq-dev-api-key-default"
     },
     {
       "key": "businessClientId",
@@ -46,15 +48,66 @@
       "key": "accessToken",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "OAuth access token (automatically set after authentication)"
     },
     {
       "key": "tokenExpiry",
       "value": "",
       "type": "default",
-      "enabled": true
+      "enabled": true,
+      "description": "Token expiry timestamp (automatically set)"
+    },
+    {
+      "key": "currentVersion",
+      "value": "v1",
+      "type": "default",
+      "enabled": true,
+      "description": "Current API version to use (v1, v2, v3, v4, v5, v6, v7, v8, v9)"
+    },
+    {
+      "key": "v1_response",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Stored v1 response for comparison"
+    },
+    {
+      "key": "v1_version",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "v1 API version metadata"
+    },
+    {
+      "key": "v1_status",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "v1 version status"
+    },
+    {
+      "key": "v9_response",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "Stored v9 response for comparison"
+    },
+    {
+      "key": "v9_version",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "v9 API version metadata"
+    },
+    {
+      "key": "v9_status",
+      "value": "",
+      "type": "default",
+      "enabled": true,
+      "description": "v9 version status"
     }
   ],
   "_postman_variable_scope": "environment",
-  "description": "Default client environment with CLI001 preferences:\n- Blocks APCO Insurance\n- Max 2 providers\n- Expected result: 2 quotes (Client Direct, Route66)\n\nIMPORTANT: This is a template file. Copy to postman-environment-default.json and fill in the credentials."
+  "description": "Default client environment with CLI001 preferences and versioning support.\n\nClient Preferences (CLI001):\n- Blocks APCO Insurance\n- Max 2 providers\n- Expected result: 2 quotes (Client Direct, Route66)\n\nAPI Versions:\n- v1: Stable (production)\n- v2-v9: Testing/planned\n\nSetup Instructions:\n1. Get credentials from AWS Secrets Manager:\n   - iqq-dev-cognito-client-default (client_id, client_secret)\n   - iqq-dev-api-key-default (api_key)\n2. Replace YOUR_CLIENT_ID, YOUR_CLIENT_SECRET, YOUR_API_KEY\n3. Run 'Get OAuth Token' to authenticate\n4. Test endpoints with different versions\n\nIMPORTANT: This is a template file. Copy and fill in your credentials."
 }

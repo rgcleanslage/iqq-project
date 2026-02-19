@@ -1,0 +1,671 @@
+{
+  "info": {
+    "name": "iQQ Insurance Quote API - Versioned",
+    "description": "Complete API collection with versioning support (v1-v9), OAuth authentication, and automatic client ID mapping.\n\nFeatures:\n- Multiple API versions (v1-v9)\n- OAuth 2.0 authentication\n- Automatic credential encoding\n- Client preference support\n- Version metadata in responses\n- Deprecation header detection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "2.0.0"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Get OAuth Token",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Get credentials from environment",
+                  "const clientId = pm.environment.get('clientId');",
+                  "const clientSecret = pm.environment.get('clientSecret');",
+                  "",
+                  "if (!clientId || !clientSecret) {",
+                  "    console.error('ERROR: clientId or clientSecret not set in environment');",
+                  "    throw new Error('Missing credentials in environment');",
+                  "}",
+                  "",
+                  "// Encode credentials as Base64",
+                  "const credentials = clientId + ':' + clientSecret;",
+                  "const base64Credentials = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(credentials));",
+                  "",
+                  "console.log('✓ Credentials encoded');",
+                  "console.log('Client ID:', clientId);",
+                  "console.log('Base64 (first 30 chars):', base64Credentials.substring(0, 30) + '...');",
+                  "",
+                  "// Set authorization header",
+                  "pm.request.headers.upsert({",
+                  "    key: 'Authorization',",
+                  "    value: 'Basic ' + base64Credentials",
+                  "});",
+                  "",
+                  "console.log('✓ Authorization header set');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    if (jsonData.access_token) {",
+                  "        pm.environment.set('accessToken', jsonData.access_token);",
+                  "        const expiryTime = Date.now() + ((jsonData.expires_in - 300) * 1000);",
+                  "        pm.environment.set('tokenExpiry', expiryTime);",
+                  "        ",
+                  "        console.log('✓ SUCCESS: Token obtained and saved');",
+                  "        console.log('Token expires in:', jsonData.expires_in, 'seconds');",
+                  "        console.log('Token (first 50 chars):', jsonData.access_token.substring(0, 50) + '...');",
+                  "        ",
+                  "        pm.test('Token obtained successfully', function() {",
+                  "            pm.expect(jsonData.access_token).to.be.a('string');",
+                  "            pm.expect(jsonData.expires_in).to.be.a('number');",
+                  "        });",
+                  "    }",
+                  "} else {",
+                  "    console.error('✗ FAILED: Status', pm.response.code);",
+                  "    console.error('Response:', pm.response.text());",
+                  "    ",
+                  "    pm.test('Authentication failed', function() {",
+                  "        pm.response.to.have.status(200);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "iqq-api/read",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{cognitoUrl}}/oauth2/token",
+              "host": ["{{cognitoUrl}}"],
+              "path": ["oauth2", "token"]
+            },
+            "description": "Get OAuth token with automatic credential encoding.\n\nRequires environment variables:\n- clientId\n- clientSecret\n\nThe pre-request script will encode credentials and set the Authorization header."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "v1 (Stable)",
+      "item": [
+        {
+          "name": "Package",
+          "item": [
+            {
+              "name": "Get Package",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('Status code is 200', function() {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test('Response has version metadata', function() {",
+                      "    const jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.metadata).to.exist;",
+                      "    pm.expect(jsonData.metadata.apiVersion).to.equal('v1');",
+                      "});",
+                      "",
+                      "// Check for deprecation headers",
+                      "const deprecationDate = pm.response.headers.get('X-API-Deprecation-Date');",
+                      "const sunsetDate = pm.response.headers.get('X-API-Sunset-Date');",
+                      "",
+                      "if (deprecationDate) {",
+                      "    console.warn('⚠️ API VERSION DEPRECATED');",
+                      "    console.warn('Deprecation Date:', deprecationDate);",
+                      "    console.warn('Sunset Date:', sunsetDate);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60 months",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "package"],
+                  "query": [
+                    {
+                      "key": "productCode",
+                      "value": "MBP"
+                    },
+                    {
+                      "key": "coverageType",
+                      "value": "COMPREHENSIVE"
+                    },
+                    {
+                      "key": "vehicleValue",
+                      "value": "25000"
+                    },
+                    {
+                      "key": "term",
+                      "value": "60 months"
+                    }
+                  ]
+                },
+                "description": "Get package quote from v1 API (stable version).\n\nResponse includes:\n- Provider quotes\n- Best quote calculation\n- Version metadata (apiVersion, versionStatus)\n- Deprecation headers (if deprecated)"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Lender",
+          "item": [
+            {
+              "name": "Get Lender",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/lender?lenderId=LENDER-001",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "lender"],
+                  "query": [
+                    {
+                      "key": "lenderId",
+                      "value": "LENDER-001"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Product",
+          "item": [
+            {
+              "name": "Get Product",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/product?productId=PROD-001",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "product"],
+                  "query": [
+                    {
+                      "key": "productId",
+                      "value": "PROD-001"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Document",
+          "item": [
+            {
+              "name": "Get Document",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/document",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "document"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ],
+      "description": "v1 API endpoints (stable version)"
+    },
+    {
+      "name": "v2-v9 (Testing)",
+      "item": [
+        {
+          "name": "v2",
+          "item": [
+            {
+              "name": "Get Package (v2)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v2/package?productCode=MBP",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v2", "package"],
+                  "query": [
+                    {
+                      "key": "productCode",
+                      "value": "MBP"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "v5",
+          "item": [
+            {
+              "name": "Get Package (v5)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v5/package?productCode=MBP",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v5", "package"],
+                  "query": [
+                    {
+                      "key": "productCode",
+                      "value": "MBP"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "v9 (Latest)",
+          "item": [
+            {
+              "name": "Get Package (v9)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v9/package?productCode=MBP",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v9", "package"],
+                  "query": [
+                    {
+                      "key": "productCode",
+                      "value": "MBP"
+                    }
+                  ]
+                },
+                "description": "Latest deployed version (v9)"
+              },
+              "response": []
+            },
+            {
+              "name": "Get Lender (v9)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v9/lender",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v9", "lender"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Product (v9)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v9/product",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v9", "product"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Document (v9)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v9/document",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v9", "document"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ],
+      "description": "Testing versions (v2-v9). Use these to test new features before they go to production."
+    },
+    {
+      "name": "Version Comparison",
+      "item": [
+        {
+          "name": "Compare v1 vs v9",
+          "item": [
+            {
+              "name": "Package v1",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const jsonData = pm.response.json();",
+                      "pm.environment.set('v1_response', JSON.stringify(jsonData));",
+                      "pm.environment.set('v1_version', jsonData.metadata?.apiVersion);",
+                      "pm.environment.set('v1_status', jsonData.metadata?.versionStatus);",
+                      "",
+                      "console.log('v1 API Version:', jsonData.metadata?.apiVersion);",
+                      "console.log('v1 Status:', jsonData.metadata?.versionStatus);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v1/package?productCode=MBP",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v1", "package"],
+                  "query": [
+                    {
+                      "key": "productCode",
+                      "value": "MBP"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Package v9",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const jsonData = pm.response.json();",
+                      "pm.environment.set('v9_response', JSON.stringify(jsonData));",
+                      "pm.environment.set('v9_version', jsonData.metadata?.apiVersion);",
+                      "pm.environment.set('v9_status', jsonData.metadata?.versionStatus);",
+                      "",
+                      "console.log('v9 API Version:', jsonData.metadata?.apiVersion);",
+                      "console.log('v9 Status:', jsonData.metadata?.versionStatus);",
+                      "",
+                      "// Compare with v1",
+                      "const v1Version = pm.environment.get('v1_version');",
+                      "const v1Status = pm.environment.get('v1_status');",
+                      "",
+                      "console.log('\\n=== VERSION COMPARISON ===');",
+                      "console.log('v1:', v1Version, '(' + v1Status + ')');",
+                      "console.log('v9:', jsonData.metadata?.apiVersion, '(' + jsonData.metadata?.versionStatus + ')');"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "x-api-key",
+                    "value": "{{apiKey}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/v9/package?productCode=MBP",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["v9", "package"],
+                  "query": [
+                    {
+                      "key": "productCode",
+                      "value": "MBP"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "description": "Run both requests in sequence to compare v1 and v9 responses"
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com",
+      "type": "string"
+    },
+    {
+      "key": "cognitoUrl",
+      "value": "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com",
+      "type": "string"
+    }
+  ]
+}
