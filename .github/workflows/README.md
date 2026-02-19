@@ -1,14 +1,256 @@
-# GitHub Actions CI/CD Setup
+# GitHub Actions Workflows
 
-This document explains the GitHub Actions workflows for the iQQ Platform.
+This document explains all GitHub Actions workflows for the iQQ Platform.
+
+## 📊 Workflow Status
+
+[![Add New Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/add-new-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/add-new-version.yml)
+[![Deploy Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/deploy-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/deploy-version.yml)
+[![Deprecate Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/deprecate-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/deprecate-version.yml)
+[![Sunset Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/sunset-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/sunset-version.yml)
+[![Generate Migration Guide](https://github.com/rgcleanslage/iqq-project/actions/workflows/generate-migration-guide.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/generate-migration-guide.yml)
 
 ## Overview
 
-The platform uses separate workflows for each repository:
-- **SAM Services** (5 repos): Test, build, and deploy Lambda functions
-- **Terraform Infrastructure** (1 repo): Validate, plan, and apply infrastructure changes
+The platform uses two types of workflows:
 
-## Workflows
+1. **API Versioning Workflows** (Root repository) - Manage API versions across all services
+2. **Service Deployment Workflows** (Service repositories) - Deploy individual services
+
+## API Versioning Workflows
+
+### 1. Add New API Version
+
+**File:** `.github/workflows/add-new-version.yml`  
+**Purpose:** Automate adding a new API version across all repositories
+
+**Features:**
+- ✅ Creates release branches in all 5 repositories
+- ✅ Updates version policy configurations
+- ✅ Generates migration guide template
+- ✅ Creates pull requests automatically
+- ✅ Provides Terraform configuration templates
+- ✅ Concurrency control prevents duplicate runs
+
+**Usage:**
+```
+Actions → Add New API Version → Run workflow
+Inputs:
+  - new_version: v3
+  - status: planned
+  - migration_guide_url: https://docs.iqq.com/api/migration
+```
+
+**Duration:** ~2 minutes  
+**Creates:** 6 pull requests + 5 release branches
+
+**See:** [ADD_NEW_VERSION_WORKFLOW_GUIDE.md](../../docs/deployment/ADD_NEW_VERSION_WORKFLOW_GUIDE.md)
+
+### 2. Deploy API Version
+
+**File:** `.github/workflows/deploy-version.yml`  
+**Purpose:** Deploy all services for a specific API version
+
+**Features:**
+- ✅ Deploys from release branches (with fallback to main)
+- ✅ Validates release branches exist
+- ✅ Parallel service deployment
+- ✅ Publishes Lambda versions
+- ✅ Updates Lambda aliases
+- ✅ Concurrency control per version
+
+**Usage:**
+```
+Actions → Deploy API Version → Run workflow
+Inputs:
+  - version: v1
+  - services: all
+  - environment: dev
+```
+
+**Duration:** ~15-20 minutes  
+**Deploys:** 4 services in parallel
+
+### 3. Deprecate API Version
+
+**File:** `.github/workflows/deprecate-version.yml`  
+**Purpose:** Mark a version as deprecated with sunset date
+
+**Features:**
+- ✅ Updates version policy
+- ✅ Sets sunset date
+- ✅ Deploys updated configuration to all services
+- ✅ Verifies deprecation headers
+- ✅ Concurrency control per version
+
+**Usage:**
+```
+Actions → Deprecate API Version → Run workflow
+Inputs:
+  - version: v1
+  - sunset_date: 2026-12-31
+  - migration_guide_url: https://docs.iqq.com/api/migration/v1-to-v2
+```
+
+**Duration:** ~5-10 minutes
+
+### 4. Sunset API Version
+
+**File:** `.github/workflows/sunset-version.yml`  
+**Purpose:** Remove a deprecated version from production
+
+**Features:**
+- ✅ Removes API Gateway stage
+- ✅ Deletes Lambda aliases
+- ✅ Updates version policy
+- ✅ Archives documentation
+- ✅ Requires confirmation
+- ✅ Concurrency control per version
+
+**Usage:**
+```
+Actions → Sunset API Version → Run workflow
+Inputs:
+  - version: v1
+  - confirm: CONFIRM
+```
+
+**Duration:** ~5 minutes  
+**Warning:** Irreversible operation!
+
+### 5. Generate Migration Guide
+
+**File:** `.github/workflows/generate-migration-guide.yml`  
+**Purpose:** Auto-generate migration guide from code analysis
+
+**Features:**
+- ✅ Analyzes code changes across services
+- ✅ Compares handler signatures
+- ✅ Detects data model changes
+- ✅ Generates migration steps
+- ✅ Creates pull request with guide
+- ✅ Concurrency control per version pair
+
+**Usage:**
+```
+Actions → Generate Migration Guide → Run workflow
+Inputs:
+  - from_version: v2
+  - to_version: v3
+  - analyze_services: all
+```
+
+**Duration:** ~3-5 minutes  
+**Creates:** 1 pull request with migration guide
+
+## Service Deployment Workflows
+
+Each service repository has its own deployment workflow.
+
+### Service Deploy Workflow
+
+**File:** `iqq-{service}-service/.github/workflows/deploy.yml`  
+**Purpose:** Deploy a single service to a specific version
+
+**Features:**
+- ✅ Validates version configuration
+- ✅ Runs tests
+- ✅ Builds application
+- ✅ Deploys with SAM
+- ✅ Publishes Lambda version
+- ✅ Updates Lambda alias
+- ✅ Verifies deployment
+
+**Usage:**
+```
+Actions → Deploy Service → Run workflow
+Inputs:
+  - version: v1
+  - environment: dev
+  - triggered_by: manual
+```
+
+**Duration:** ~3-4 minutes per service
+
+## Workflow Dependencies
+
+```
+Add New Version
+  ├── Creates release branches
+  ├── Updates configurations
+  └── Generates migration guide
+       ↓
+Deploy API Version
+  ├── Deploys from release branches
+  ├── Triggers service workflows
+  └── Verifies deployments
+       ↓
+Deprecate API Version
+  ├── Updates version policy
+  └── Deploys deprecation headers
+       ↓
+Sunset API Version
+  ├── Removes API Gateway stage
+  ├── Deletes Lambda aliases
+  └── Archives documentation
+```
+
+## Concurrency Control
+
+All workflows use concurrency control to prevent conflicts:
+
+```yaml
+concurrency:
+  group: workflow-name-${{ inputs.version }}
+  cancel-in-progress: false
+```
+
+**Benefits:**
+- Prevents duplicate deployments
+- Avoids race conditions
+- Clearer workflow status
+
+## Required Secrets
+
+### Root Repository (iqq-project)
+
+- `PAT_TOKEN` - Personal Access Token for cross-repo operations
+  - Permissions: `repo`, `workflow`
+  - Used by: add-new-version, deprecate-version, sunset-version
+
+- `AWS_ROLE_ARN` (Optional) - IAM role for verification
+  - Value: `arn:aws:iam::785826687678:role/github-actions-sam-dev`
+  - Used by: deploy-version (verification step only)
+
+### Service Repositories
+
+- `AWS_ROLE_ARN` - IAM role for deployment
+  - Value: `arn:aws:iam::785826687678:role/github-actions-sam-dev`
+  - Used by: All service deployment workflows
+
+- `SAM_DEPLOYMENT_BUCKET` - S3 bucket for SAM artifacts
+  - Value: `iqq-sam-deployments-785826687678`
+  - Used by: All service deployment workflows
+
+## Release Branch Strategy
+
+Workflows now support release branches for version-specific code:
+
+**Branch Structure:**
+```
+main                    # Development
+release/v1             # Production v1
+release/v2             # Production v2
+release/v3             # Future v3
+```
+
+**Deployment Flow:**
+1. Add new version → Creates `release/v3` branches
+2. Deploy version → Deploys from `release/v3` (or main if not exists)
+3. Hotfix → Make changes to `release/v3` directly
+4. Backport → Cherry-pick fixes between release branches
+
+**See:** [RELEASE_BRANCH_STRATEGY.md](../../docs/deployment/RELEASE_BRANCH_STRATEGY.md)
 
 ### SAM Service Workflows
 

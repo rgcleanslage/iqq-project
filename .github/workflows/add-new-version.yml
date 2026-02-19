@@ -26,6 +26,10 @@ env:
   AWS_REGION: us-east-1
   GITHUB_ORG: rgcleanslage
 
+concurrency:
+  group: add-version-${{ github.event.inputs.new_version }}
+  cancel-in-progress: false
+
 permissions:
   id-token: write
   contents: write
@@ -756,9 +760,48 @@ jobs:
             **Automated by**: Add New API Version workflow
             **Part of**: Root PR #[link to root PR]
 
+  create-release-branches:
+    name: Create Release Branches
+    needs: validate-version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repo: [iqq-package-service, iqq-lender-service, iqq-product-service, iqq-document-service, iqq-infrastructure]
+      fail-fast: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITHUB_ORG }}/${{ matrix.repo }}
+          token: ${{ secrets.PAT_TOKEN }}
+          fetch-depth: 0
+      
+      - name: Create release branch
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          BRANCH_NAME="release/$VERSION"
+          
+          echo "🌿 Creating release branch: $BRANCH_NAME in ${{ matrix.repo }}"
+          
+          # Check if branch already exists on remote
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "ℹ️  Branch $BRANCH_NAME already exists on remote"
+            exit 0
+          fi
+          
+          # Ensure we're on main and it's up to date
+          git checkout main 2>/dev/null || git checkout master 2>/dev/null
+          git pull origin main 2>/dev/null || git pull origin master 2>/dev/null
+          
+          # Create and push branch from main
+          git checkout -b "$BRANCH_NAME"
+          git push -u origin "$BRANCH_NAME"
+          
+          echo "✅ Created and pushed branch $BRANCH_NAME in ${{ matrix.repo }}"
+
   notify-completion:
     name: Notify Completion
-    needs: [validate-version, update-root-config, update-infrastructure, update-service-configs]
+    needs: [validate-version, update-root-config, update-infrastructure, update-service-configs, create-release-branches]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -778,6 +821,15 @@ jobs:
           echo "   - iqq-infrastructure"
           echo "   - iqq-package-service"
           echo "   - iqq-lender-service"
+          echo "   - iqq-product-service"
+          echo "   - iqq-document-service"
+          echo ""
+          echo "✅ Release branches created:"
+          echo "   - iqq-package-service/release/$VERSION"
+          echo "   - iqq-lender-service/release/$VERSION"
+          echo "   - iqq-product-service/release/$VERSION"
+          echo "   - iqq-document-service/release/$VERSION"
+          echo "   - iqq-infrastructure/release/$VERSION"
           echo "   - iqq-product-service"
           echo "   - iqq-document-service"
           echo ""

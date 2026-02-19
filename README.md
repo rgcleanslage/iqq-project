@@ -6,9 +6,21 @@ Modern, serverless insurance quoting platform with provider integration, API Gat
 
 ✅ All 6 repositories created on GitHub  
 ✅ Infrastructure deployed to AWS  
+✅ OAuth 2.0 with multiple Cognito clients  
+✅ Custom TOKEN authorizer with API key validation  
 ✅ All tests passing (124 unit tests, 10 API tests)  
 ✅ Security hardened (no hardcoded credentials)  
-✅ HTTP-based provider invocation working  
+✅ Step Functions orchestration working  
+✅ Complete API documentation with Postman collections  
+✅ API versioning with automated workflows  
+
+## 🔄 Workflow Status
+
+[![Add New Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/add-new-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/add-new-version.yml)
+[![Deploy Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/deploy-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/deploy-version.yml)
+[![Deprecate Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/deprecate-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/deprecate-version.yml)
+[![Sunset Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/sunset-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/sunset-version.yml)
+[![Generate Migration Guide](https://github.com/rgcleanslage/iqq-project/actions/workflows/generate-migration-guide.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/generate-migration-guide.yml)  
 
 ## 📦 GitHub Repositories
 
@@ -75,18 +87,18 @@ source .env
 - **Adapters** - CSV and XML to JSON transformers
 
 ### Infrastructure
-- **API Gateway** - REST API with REQUEST authorizer
-- **Cognito** - OAuth 2.0 client credentials flow
-- **Step Functions** - Dynamic quote orchestration with HTTP invocation
+- **API Gateway** - REST API with custom TOKEN authorizer
+- **Cognito** - OAuth 2.0 client credentials flow (4 app clients)
+- **Step Functions** - Dynamic quote orchestration with Lambda invocation
 - **DynamoDB** - Provider configuration storage
 - **Lambda Versioning** - v1, v2, latest aliases
 - **CloudWatch** - Structured logging with 7-day retention
 - **X-Ray** - Distributed tracing
 
 ### Security
-- **OAuth 2.0** - JWT token validation via Cognito
+- **OAuth 2.0** - JWT token validation via Cognito (4 app clients)
 - **API Keys** - Required for all API requests
-- **REQUEST Authorizer** - Validates both OAuth token and API key
+- **Custom TOKEN Authorizer** - Validates OAuth access tokens and API keys
 - **No Hardcoded Credentials** - All secrets in environment variables
 
 ### Technology Stack
@@ -160,7 +172,12 @@ source .env
 - [docs/deployment/API_KEY_DEPLOYMENT_GUIDE.md](docs/deployment/API_KEY_DEPLOYMENT_GUIDE.md) - API key setup
 
 ### API Documentation
-- [docs/api/OPENAPI_GUIDE.md](docs/api/OPENAPI_GUIDE.md) - OpenAPI specification guide
+- [docs/api/README.md](docs/api/README.md) - API documentation overview
+- [docs/api/openapi-complete.yaml](docs/api/openapi-complete.yaml) - Complete OpenAPI 3.0.3 specification
+- [docs/api/OPENAPI_USAGE_GUIDE.md](docs/api/OPENAPI_USAGE_GUIDE.md) - How to use OpenAPI spec
+- [docs/api/API_DOCUMENTATION_COMPLETE.md](docs/api/API_DOCUMENTATION_COMPLETE.md) - Complete API docs
+- [docs/api/CLIENT_CREDENTIALS_MAPPING.md](docs/api/CLIENT_CREDENTIALS_MAPPING.md) - OAuth client mapping
+- [docs/api/POSTMAN_STEP_BY_STEP.md](docs/api/POSTMAN_STEP_BY_STEP.md) - Postman setup guide
 
 ## 🧪 Testing
 
@@ -196,9 +213,10 @@ source .env
 
 ### Authentication & Authorization
 - **OAuth 2.0** - Client credentials flow via Cognito
+- **Multiple Clients** - 4 separate app clients (Default, Partner A, Partner B, Legacy)
 - **JWT Validation** - Token verification with JWKS
 - **API Key Validation** - Required for all requests
-- **REQUEST Authorizer** - Validates both token and API key
+- **Custom TOKEN Authorizer** - Validates OAuth access tokens and API keys
 
 ### Credentials Management
 - ✅ No hardcoded credentials in source code
@@ -315,10 +333,11 @@ aws stepfunctions describe-execution --execution-arn <arn>
 ## 🎓 What This Demonstrates
 
 - ✅ Serverless microservices architecture
-- ✅ API Gateway with custom authorizer
-- ✅ OAuth 2.0 authentication with Cognito
-- ✅ Step Functions orchestration
-- ✅ HTTP-based service invocation
+- ✅ API Gateway with custom TOKEN authorizer
+- ✅ OAuth 2.0 authentication with multiple Cognito clients
+- ✅ Step Functions orchestration with Lambda invocation
+- ✅ Complete OpenAPI 3.0.3 specification
+- ✅ Postman collections with OAuth 2.0 support
 - ✅ Infrastructure as Code with Terraform
 - ✅ Serverless deployment with SAM
 - ✅ TypeScript Lambda development
@@ -381,6 +400,6 @@ This is a reference architecture for demonstration purposes.
 
 ---
 
-**Last Updated:** February 16, 2026  
+**Last Updated:** February 18, 2026  
 **Version:** 1.0.0  
-**Status:** Production Ready ✅
+**Status:** Production Ready with OAuth 2.0 ✅

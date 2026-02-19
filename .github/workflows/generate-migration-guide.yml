@@ -20,6 +20,10 @@ on:
 env:
   GITHUB_ORG: rgcleanslage
 
+concurrency:
+  group: migration-guide-${{ github.event.inputs.from_version }}-to-${{ github.event.inputs.to_version }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write

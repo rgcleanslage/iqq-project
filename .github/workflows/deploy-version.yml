@@ -27,6 +27,10 @@ env:
   AWS_REGION: us-east-1
   GITHUB_ORG: rgcleanslage
 
+concurrency:
+  group: deploy-${{ github.event.inputs.version }}-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
 jobs:
   validate-version:
     name: Validate Version Configuration
@@ -37,6 +41,24 @@ jobs:
     steps:
       - name: Checkout root repository
         uses: actions/checkout@v4
+      
+      - name: Validate release branch exists
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          echo "🔍 Validating release branch for $VERSION..."
+          
+          # Check each service repository for release branch
+          for SERVICE in package lender product document; do
+            echo "Checking iqq-${SERVICE}-service..."
+            
+            if ! git ls-remote --heads "https://github.com/${{ env.GITHUB_ORG }}/iqq-${SERVICE}-service.git" "release/$VERSION" | grep -q "release/$VERSION"; then
+              echo "⚠️  Warning: release/$VERSION branch not found in iqq-${SERVICE}-service"
+              echo "   Deployment will use main branch"
+            else
+              echo "✅ release/$VERSION branch exists in iqq-${SERVICE}-service"
+            fi
+          done
       
       - name: Parse services list
         id: parse
@@ -98,13 +120,30 @@ jobs:
             console.log(`🚀 Triggering deployment for iqq-${service}-service`);
             console.log(`   Version: ${version}`);
             console.log(`   Environment: ${environment}`);
+            console.log(`   Branch: release/${version} (fallback to main if not exists)`);
             
             try {
+              // Try to deploy from release branch first, fallback to main
+              let ref = `release/${version}`;
+              
+              // Check if release branch exists
+              try {
+                await github.rest.repos.getBranch({
+                  owner: context.repo.owner,
+                  repo: `iqq-${service}-service`,
+                  branch: ref
+                });
+                console.log(`✅ Using release branch: ${ref}`);
+              } catch (error) {
+                console.log(`⚠️  Release branch ${ref} not found, using main`);
+                ref = 'main';
+              }
+              
               const response = await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
                 repo: `iqq-${service}-service`,
                 workflow_id: 'deploy.yml',
-                ref: 'main',
+                ref: ref,
                 inputs: {
                   version: version,
                   environment: environment,
@@ -112,7 +151,7 @@ jobs:
                 }
               });
               
-              console.log(`✅ Deployment triggered for iqq-${service}-service`);
+              console.log(`✅ Deployment triggered for iqq-${service}-service from ${ref}`);
             } catch (error) {
               console.error(`❌ Failed to trigger deployment: ${error.message}`);
               throw error;

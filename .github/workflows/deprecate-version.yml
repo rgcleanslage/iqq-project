@@ -24,6 +24,10 @@ env:
   AWS_REGION: us-east-1
   GITHUB_ORG: rgcleanslage
 
+concurrency:
+  group: deprecate-${{ github.event.inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   validate-deprecation:
     name: Validate Deprecation Request

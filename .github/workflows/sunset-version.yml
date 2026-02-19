@@ -19,6 +19,10 @@ env:
   AWS_REGION: us-east-1
   GITHUB_ORG: rgcleanslage
 
+concurrency:
+  group: sunset-${{ github.event.inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   validate-sunset:
     name: Validate Sunset Request
