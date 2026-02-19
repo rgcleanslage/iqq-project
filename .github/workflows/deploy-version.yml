@@ -265,6 +265,11 @@ jobs:
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
           echo "api_key=$API_KEY" >> $GITHUB_OUTPUT
 
+      - name: Wait for API Gateway propagation
+        run: |
+          echo "⏳ Waiting 30 seconds for API Gateway deployment to propagate..."
+          sleep 30
+
       - name: Test deployed services
         env:
           TOKEN: ${{ steps.auth.outputs.token }}
@@ -272,6 +277,9 @@ jobs:
           VERSION: ${{ github.event.inputs.version }}
         run: |
           echo "🧪 Testing deployed services on version $VERSION"
+
+          MAX_RETRIES=3
+          RETRY_DELAY=10
 
           FAILED=0
           for SERVICE in package lender product document; do
@@ -285,28 +293,42 @@ jobs:
               document) PARAMS="" ;;
             esac
 
-            RESPONSE=$(curl -s -w "\n%{http_code}" \
-              -H "Authorization: Bearer $TOKEN" \
-              -H "x-api-key: $API_KEY" \
-              "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/$VERSION/$SERVICE$PARAMS")
+            # Retry logic for each service
+            SUCCESS=0
+            for ATTEMPT in $(seq 1 $MAX_RETRIES); do
+              if [ $ATTEMPT -gt 1 ]; then
+                echo "  ⏳ Retry attempt $ATTEMPT/$MAX_RETRIES (waiting ${RETRY_DELAY}s)..."
+                sleep $RETRY_DELAY
+              fi
 
-            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-            BODY=$(echo "$RESPONSE" | sed '$d')
+              RESPONSE=$(curl -s -w "\n%{http_code}" \
+                -H "Authorization: Bearer $TOKEN" \
+                -H "x-api-key: $API_KEY" \
+                "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/$VERSION/$SERVICE$PARAMS")
 
-            if [ "$HTTP_CODE" -eq 200 ]; then
-              API_VERSION=$(echo "$BODY" | jq -r '.metadata.apiVersion // empty')
-              echo "  ✅ HTTP 200 - Service responding"
-              [ ! -z "$API_VERSION" ] && echo "  ✅ Version header: $API_VERSION"
-            else
-              echo "  ❌ HTTP $HTTP_CODE - Service failed"
-              echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+              HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+              BODY=$(echo "$RESPONSE" | sed '$d')
+
+              if [ "$HTTP_CODE" -eq 200 ]; then
+                API_VERSION=$(echo "$BODY" | jq -r '.metadata.apiVersion // empty')
+                echo "  ✅ HTTP 200 - Service responding"
+                [ ! -z "$API_VERSION" ] && echo "  ✅ Version header: $API_VERSION"
+                SUCCESS=1
+                break
+              elif [ $ATTEMPT -eq $MAX_RETRIES ]; then
+                echo "  ❌ HTTP $HTTP_CODE - Service failed after $MAX_RETRIES attempts"
+                echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+              fi
+            done
+
+            if [ $SUCCESS -eq 0 ]; then
               FAILED=1
             fi
           done
 
           if [ $FAILED -eq 1 ]; then
             echo ""
-            echo "❌ Some services failed verification"
+            echo "❌ Some services failed verification after retries"
             exit 1
           fi
 
