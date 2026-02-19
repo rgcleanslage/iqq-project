@@ -186,7 +186,7 @@ jobs:
             --output json)
           
           # Update with deprecation info
-          UPDATED_ENV=$(echo "$CURRENT_ENV" | jq \
+          UPDATED_ENV=$(echo "$CURRENT_ENV" | jq -c \
             --arg status "deprecated" \
             --arg sunset "$SUNSET_TIMESTAMP" \
             --arg guide "$MIGRATION_URL" \
@@ -201,7 +201,7 @@ jobs:
           # Update the function configuration
           aws lambda update-function-configuration \
             --function-name "${FUNCTION_NAME}:${FUNCTION_VERSION}" \
-            --environment "Variables=${UPDATED_ENV}" \
+            --environment "{\"Variables\":${UPDATED_ENV}}" \
             > /dev/null
           
           echo "✅ Updated environment variables for ${FUNCTION_NAME}:${ALIAS_NAME}"
