@@ -220,7 +220,7 @@ jobs:
 
   verify-deployments:
     name: Verify Service Deployments
-    needs: [validate-version, deploy-services]
+    needs: update-api-gateway
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -337,7 +337,7 @@ jobs:
 
   update-api-gateway:
     name: Update API Gateway
-    needs: verify-deployments
+    needs: [validate-version, deploy-services]
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS credentials
