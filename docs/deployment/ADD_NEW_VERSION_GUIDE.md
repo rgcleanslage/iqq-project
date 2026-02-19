@@ -10,6 +10,29 @@ Adding a new version involves:
 3. Updating service version policies
 4. Creating Lambda aliases
 5. Deploying and testing
+6. Generating migration guide (automated)
+
+## Automated Workflow
+
+You can automate most of these steps using the "Add New API Version" workflow:
+
+1. Go to: https://github.com/rgcleanslage/iqq-project/actions
+2. Click "Add New API Version"
+3. Click "Run workflow"
+4. Enter:
+   - **new_version**: `v3` (or desired version)
+   - **status**: `planned`, `alpha`, or `beta`
+   - **migration_guide_url**: Optional URL
+5. Click "Run workflow"
+
+This will automatically:
+- Create PRs in all 6 repositories
+- Update version policies
+- Generate migration guide template
+- Provide Terraform configuration
+- Create deployment instructions
+
+After the workflow completes, you can generate a detailed migration guide by running the "Generate Migration Guide from Code Changes" workflow.
 
 ## Step-by-Step Guide
 
@@ -365,11 +388,56 @@ If you need to remove a version:
 5. **Monitor adoption** - Track usage of new version
 6. **Deprecate old versions** - Give 90+ days notice before sunset
 
+## Automated Migration Guide Generation
+
+After adding a new version, you can automatically generate a migration guide based on code analysis:
+
+### Using the Generate Migration Guide Workflow
+
+1. Go to: https://github.com/rgcleanslage/iqq-project/actions
+2. Click "Generate Migration Guide from Code Changes"
+3. Click "Run workflow"
+4. Enter:
+   - **from_version**: `v2` (source version)
+   - **to_version**: `v3` (target version)
+   - **analyze_services**: `all` (or comma-separated list)
+5. Click "Run workflow"
+
+This workflow will:
+- Analyze code changes across all services
+- Extract handler signatures and data models
+- Compare dependencies between versions
+- Generate comprehensive migration guide
+- Create PR with auto-generated documentation
+
+The generated guide includes:
+- Detected code changes by service
+- Handler signature comparisons
+- Data model changes
+- Dependency updates
+- Migration steps with code examples
+- Testing instructions
+- Rollback plan
+
+After the workflow completes, review the PR and enhance the guide with:
+- Specific breaking change descriptions
+- Behavioral differences
+- Timeline information
+- Customer-facing examples
+
 ## Related Documentation
 
 - [API Versioning Setup](../api/API_VERSIONING_SETUP.md)
 - [GitHub Actions Versioning](./GITHUB_ACTIONS_VERSIONING.md)
 - [Terraform Implementation](./API_VERSIONING_TERRAFORM.md)
+
+## Workflows Available
+
+1. **Add New API Version** - Automates version creation across all repositories
+2. **Generate Migration Guide from Code Changes** - Analyzes code and generates migration docs
+3. **Deploy API Version** - Deploys services to specific version
+4. **Deprecate API Version** - Marks version as deprecated
+5. **Sunset API Version** - Removes version from API Gateway
 
 ---
 
