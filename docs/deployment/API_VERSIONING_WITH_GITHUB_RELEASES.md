@@ -101,7 +101,36 @@ Go to: Actions → Add New API Version → Run workflow
   status: planned
 ```
 
-### 2. Deploy API Version
+### 2. Update Version Status
+
+**Workflow**: `update-version-status.yml`
+**When to use**: You want to promote a version through its lifecycle (planned → alpha → beta → stable).
+
+**Inputs**:
+| Input | Required | Description |
+|---|---|---|
+| version | Yes | Version to update, e.g. `v2` |
+| new_status | Yes | New status: `planned`, `alpha`, `beta`, `stable`, `deprecated`, `sunset` |
+| make_current | No | Mark as current stable version (only for stable status) |
+
+**What it does**:
+1. Validates the version exists as a GitHub Release
+2. Updates the status in the release metadata
+3. Changes pre-release flag (stable = full release, others = pre-release)
+4. Warns about unusual status transitions
+5. Optionally marks the version as the current stable version
+
+**Example**:
+```
+Go to: Actions → Update Version Status → Run workflow
+  version: v2
+  new_status: stable
+  make_current: true
+```
+
+**Note**: For deprecating versions, use the "Deprecate API Version" workflow instead — it sets sunset dates and triggers redeployments.
+
+### 3. Deploy API Version
 
 **Workflow**: `deploy-version.yml`
 **When to use**: You want to deploy (or redeploy) services for a specific version.
@@ -125,7 +154,7 @@ Go to: Actions → Add New API Version → Run workflow
 5. Redeploys the API Gateway stage
 6. Updates the release metadata with the deploy timestamp
 
-### 3. Deprecate API Version
+### 4. Deprecate API Version
 
 **Workflow**: `deprecate-version.yml`
 **When to use**: You want to mark a version as deprecated and schedule its removal.
@@ -150,7 +179,7 @@ X-API-Sunset-Date: 2026-12-31
 Warning: 299 - "API version v1 is deprecated. Please migrate to v2 by 2026-12-31."
 ```
 
-### 4. Sunset API Version
+### 5. Sunset API Version
 
 **Workflow**: `sunset-version.yml`
 **When to use**: You want to permanently remove a deprecated version.
@@ -224,16 +253,22 @@ gh release list --json tagName,body --limit 100 | \
 # 1. Create v3
 #    Actions → Add New API Version → new_version: v3, status: planned
 
-# 2. Deploy v3 for testing
+# 2. Promote v3 to alpha for internal testing
+#    Actions → Update Version Status → version: v3, new_status: alpha
+
+# 3. Deploy v3 for testing
 #    Actions → Deploy API Version → version: v3
 
-# 3. When v3 is ready, manually edit the release to set status to "stable"
-#    and edit v1's release to reflect it's no longer the primary
+# 4. Promote v3 to beta for partner testing
+#    Actions → Update Version Status → version: v3, new_status: beta
 
-# 4. Deprecate v1 with 90-day notice
+# 5. When v3 is ready, promote to stable
+#    Actions → Update Version Status → version: v3, new_status: stable, make_current: true
+
+# 6. Deprecate v1 with 90-day notice
 #    Actions → Deprecate API Version → version: v1, sunset_date: 2026-06-01
 
-# 5. After sunset date, remove v1
+# 7. After sunset date, remove v1
 #    Actions → Sunset API Version → version: v1, confirm: CONFIRM
 ```
 
@@ -245,6 +280,7 @@ gh release list --json tagName,body --limit 100 | \
 iqq-project (root)
 ├── .github/workflows/
 │   ├── add-new-version.yml
+│   ├── update-version-status.yml
 │   ├── deploy-version.yml
 │   ├── deprecate-version.yml
 │   └── sunset-version.yml

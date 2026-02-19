@@ -1,0 +1,145 @@
+name: Update Version Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update (e.g., v1, v2)'
+        required: true
+        type: string
+      new_status:
+        description: 'New status for the version'
+        required: true
+        type: choice
+        options:
+          - planned
+          - alpha
+          - beta
+          - stable
+          - deprecated
+          - sunset
+      make_current:
+        description: 'Make this the current stable version (only for stable status)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  update-status:
+    name: Update Version Status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate and update release
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          NEW_STATUS="${{ github.event.inputs.new_status }}"
+          MAKE_CURRENT="${{ github.event.inputs.make_current }}"
+
+          echo "🔍 Updating api-${VERSION} to status: ${NEW_STATUS}"
+
+          # Check if release exists
+          RELEASE_BODY=$(gh release view "api-${VERSION}" --json body --jq '.body' 2>/dev/null)
+          if [ -z "$RELEASE_BODY" ]; then
+            echo "❌ Version $VERSION not found as a GitHub Release"
+            exit 1
+          fi
+
+          # Extract current status
+          CURRENT_STATUS=$(echo "$RELEASE_BODY" | sed -n '/```json/,/```/p' | sed '1d;$d' | jq -r '.status')
+          echo "Current status: $CURRENT_STATUS"
+
+          # Validate status transition
+          case "$CURRENT_STATUS" in
+            planned)
+              if [[ ! "$NEW_STATUS" =~ ^(alpha|beta|stable)$ ]]; then
+                echo "⚠️  Warning: Unusual transition from planned to $NEW_STATUS"
+              fi
+              ;;
+            alpha)
+              if [[ ! "$NEW_STATUS" =~ ^(beta|stable|planned)$ ]]; then
+                echo "⚠️  Warning: Unusual transition from alpha to $NEW_STATUS"
+              fi
+              ;;
+            beta)
+              if [[ ! "$NEW_STATUS" =~ ^(stable|alpha|planned)$ ]]; then
+                echo "⚠️  Warning: Unusual transition from beta to $NEW_STATUS"
+              fi
+              ;;
+            stable)
+              if [[ ! "$NEW_STATUS" =~ ^(deprecated)$ ]]; then
+                echo "⚠️  Warning: Unusual transition from stable to $NEW_STATUS"
+              fi
+              ;;
+          esac
+
+          # Update the status in JSON metadata
+          UPDATED_BODY=$(echo "$RELEASE_BODY" | \
+            sed "s/\"status\": *\"[^\"]*\"/\"status\": \"${NEW_STATUS}\"/")
+
+          # Also update the human-readable status line
+          UPDATED_BODY=$(echo "$UPDATED_BODY" | \
+            sed "s/\*\*Status\*\*: *[a-zA-Z]*/\*\*Status\*\*: ${NEW_STATUS}/")
+
+          # Update the release
+          gh release edit "api-${VERSION}" --notes "$UPDATED_BODY"
+
+          # Handle pre-release flag
+          if [ "$NEW_STATUS" == "stable" ]; then
+            gh release edit "api-${VERSION}" --prerelease=false
+            echo "✅ Marked as full release (not pre-release)"
+          else
+            gh release edit "api-${VERSION}" --prerelease
+            echo "✅ Marked as pre-release"
+          fi
+
+          echo "✅ Updated api-${VERSION} status to: ${NEW_STATUS}"
+
+          # If making this the current version, update other stable versions
+          if [ "$MAKE_CURRENT" == "true" ] && [ "$NEW_STATUS" == "stable" ]; then
+            echo ""
+            echo "📝 Updating VERSION_CURRENT references..."
+            
+            # Find all other stable versions and note them
+            OTHER_STABLE=$(gh release list --json tagName,body --limit 100 | \
+              jq -r '[.[] | select(.tagName | startswith("api-")) |
+                select(.tagName != "api-'${VERSION}'") |
+                select(.body | contains("\"status\": \"stable\""))] | .[].tagName')
+            
+            if [ ! -z "$OTHER_STABLE" ]; then
+              echo "ℹ️  Note: Other stable versions exist:"
+              echo "$OTHER_STABLE"
+              echo "   Consider deprecating them via the Deprecate Version workflow"
+            fi
+            
+            echo "✅ ${VERSION} is now the current stable version"
+          fi
+
+      - name: Summary
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          NEW_STATUS="${{ github.event.inputs.new_status }}"
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Version Status Updated"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Version: $VERSION"
+          echo "New Status: $NEW_STATUS"
+          echo ""
+          
+          if [ "$NEW_STATUS" == "stable" ]; then
+            echo "📋 Next Steps:"
+            echo "   1. Deploy the version via 'Deploy API Version' workflow"
+            echo "   2. Test all endpoints thoroughly"
+            echo "   3. Consider deprecating older stable versions"
+          elif [ "$NEW_STATUS" == "deprecated" ]; then
+            echo "⚠️  Note: Use 'Deprecate API Version' workflow instead"
+            echo "   That workflow sets sunset dates and triggers redeployments"
+          fi
