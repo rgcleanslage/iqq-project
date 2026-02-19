@@ -167,6 +167,64 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       
+      - name: Check and handle existing aliases
+        run: |
+          FUNCTION_NAME="${{ needs.validate.outputs.function-name }}"
+          VERSION="${{ github.event.inputs.version }}"
+          
+          echo "🔍 Checking for existing Lambda aliases..."
+          
+          # Check if function exists
+          if ! aws lambda get-function --function-name "$FUNCTION_NAME" 2>/dev/null; then
+            echo "ℹ️  Function doesn't exist yet, skipping alias check"
+            exit 0
+          fi
+          
+          # Check CloudFormation stack status
+          STACK_NAME="${{ needs.validate.outputs.stack-name }}"
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+          
+          echo "📊 Stack status: $STACK_STATUS"
+          
+          # If stack is in a failed state, check for orphaned aliases
+          if [[ "$STACK_STATUS" == "UPDATE_ROLLBACK_COMPLETE" ]] || [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
+            echo "⚠️  Stack is in rollback state, checking for orphaned aliases..."
+            
+            # List all aliases
+            ALIASES=$(aws lambda list-aliases \
+              --function-name "$FUNCTION_NAME" \
+              --query 'Aliases[].Name' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$ALIASES" ]; then
+              echo "🔍 Found existing aliases: $ALIASES"
+              
+              # Check if aliases are managed by CloudFormation
+              for ALIAS in $ALIASES; do
+                # Try to get the alias from CloudFormation
+                MANAGED=$(aws cloudformation describe-stack-resources \
+                  --stack-name "$STACK_NAME" \
+                  --query "StackResources[?ResourceType=='AWS::Lambda::Alias' && PhysicalResourceId contains '$ALIAS'].LogicalResourceId" \
+                  --output text 2>/dev/null || echo "")
+                
+                if [ -z "$MANAGED" ]; then
+                  echo "⚠️  Alias '$ALIAS' exists but is not managed by CloudFormation"
+                  echo "   This may cause deployment conflicts"
+                  echo "   Consider deleting it: aws lambda delete-alias --function-name $FUNCTION_NAME --name $ALIAS"
+                else
+                  echo "✅ Alias '$ALIAS' is managed by CloudFormation"
+                fi
+              done
+            else
+              echo "✅ No existing aliases found"
+            fi
+          else
+            echo "✅ Stack is in good state: $STACK_STATUS"
+          fi
+      
       - name: Deploy with SAM
         run: |
           STACK_NAME="${{ needs.validate.outputs.stack-name }}"
