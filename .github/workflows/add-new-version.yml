@@ -220,9 +220,9 @@ jobs:
             aws apigateway create-stage \
               --rest-api-id "$API_ID" --stage-name "$VERSION" \
               --deployment-id "$DEPLOYMENT_ID" \
-              --variables lambdaAlias="$VERSION" \
+              --variables lambdaAlias="$VERSION",versionStatus="${{ github.event.inputs.status }}",versionSunsetDate="null",versionMigrationGuide="${{ github.event.inputs.migration_guide_url }}",versionCurrent="$VERSION" \
               --tags Name="iqq-api-${VERSION}-dev",Stage="$VERSION",Environment="dev"
-            echo "✅ Stage $VERSION created"
+            echo "✅ Stage $VERSION created with initial stage variables"
           fi
           STAGE_URL="https://${API_ID}.execute-api.${AWS_REGION}.amazonaws.com/${VERSION}"
           echo "stage_url=$STAGE_URL" >> $GITHUB_OUTPUT

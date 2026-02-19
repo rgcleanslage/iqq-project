@@ -137,14 +137,10 @@ jobs:
 
           echo "✅ Release api-${VERSION} updated to deprecated"
 
-  update-lambda-config:
-    name: Update Lambda Environment Variables
+  update-stage-variables:
+    name: Update API Gateway Stage Variables
     needs: [validate-deprecation, update-release-metadata]
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: [package, lender, product, document]
-      fail-fast: false
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -152,66 +148,51 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update Lambda environment variables
+      - name: Update stage variables
         run: |
-          SERVICE="${{ matrix.service }}"
           VERSION="${{ github.event.inputs.version }}"
           SUNSET_TIMESTAMP="${{ needs.validate-deprecation.outputs.sunset-timestamp }}"
           MIGRATION_URL="${{ github.event.inputs.migration_guide_url }}"
           CURRENT_VERSION="${{ needs.validate-deprecation.outputs.current-version }}"
           
-          FUNCTION_NAME="iqq-${SERVICE}-service-dev"
-          ALIAS_NAME="${VERSION}"
+          API_ID=$(aws apigateway get-rest-apis \
+            --query 'items[?name==`iqq-api-dev`].id' --output text)
           
-          echo "📝 Updating environment variables for ${FUNCTION_NAME}:${ALIAS_NAME}..."
+          if [ -z "$API_ID" ]; then
+            echo "❌ API Gateway not found"
+            exit 1
+          fi
           
-          # Get the function version that the alias points to
-          FUNCTION_VERSION=$(aws lambda get-alias \
-            --function-name "$FUNCTION_NAME" \
-            --name "$ALIAS_NAME" \
-            --query 'FunctionVersion' \
-            --output text 2>/dev/null)
+          echo "📝 Updating stage variables for ${VERSION}..."
           
-          if [ -z "$FUNCTION_VERSION" ] || [ "$FUNCTION_VERSION" == "None" ]; then
-            echo "⚠️  Alias ${ALIAS_NAME} not found for ${FUNCTION_NAME}, skipping"
+          # Check if stage exists
+          if ! aws apigateway get-stage \
+            --rest-api-id "$API_ID" \
+            --stage-name "$VERSION" \
+            > /dev/null 2>&1; then
+            echo "⚠️  Stage ${VERSION} not found, skipping"
             exit 0
           fi
           
-          echo "Found function version: $FUNCTION_VERSION"
+          # Update stage variables
+          aws apigateway update-stage \
+            --rest-api-id "$API_ID" \
+            --stage-name "$VERSION" \
+            --patch-operations \
+              op=replace,path=/variables/versionStatus,value=deprecated \
+              op=replace,path=/variables/versionSunsetDate,value="${SUNSET_TIMESTAMP}" \
+              op=replace,path=/variables/versionMigrationGuide,value="${MIGRATION_URL}" \
+              op=replace,path=/variables/versionCurrent,value="${CURRENT_VERSION}"
           
-          # Get current environment variables
-          CURRENT_ENV=$(aws lambda get-function-configuration \
-            --function-name "${FUNCTION_NAME}:${FUNCTION_VERSION}" \
-            --query 'Environment.Variables' \
-            --output json)
-          
-          # Update with deprecation info
-          UPDATED_ENV=$(echo "$CURRENT_ENV" | jq -c \
-            --arg status "deprecated" \
-            --arg sunset "$SUNSET_TIMESTAMP" \
-            --arg guide "$MIGRATION_URL" \
-            --arg current "$CURRENT_VERSION" \
-            '. + {
-              VERSION_STATUS: $status,
-              VERSION_SUNSET_DATE: $sunset,
-              VERSION_MIGRATION_GUIDE: $guide,
-              VERSION_CURRENT: $current
-            }')
-          
-          # Update the function configuration
-          aws lambda update-function-configuration \
-            --function-name "${FUNCTION_NAME}:${FUNCTION_VERSION}" \
-            --environment "{\"Variables\":${UPDATED_ENV}}" \
-            > /dev/null
-          
-          echo "✅ Updated environment variables for ${FUNCTION_NAME}:${ALIAS_NAME}"
-          echo "   VERSION_STATUS=deprecated"
-          echo "   VERSION_SUNSET_DATE=${SUNSET_TIMESTAMP}"
-          echo "   VERSION_MIGRATION_GUIDE=${MIGRATION_URL}"
+          echo "✅ Updated stage variables for ${VERSION}"
+          echo "   versionStatus=deprecated"
+          echo "   versionSunsetDate=${SUNSET_TIMESTAMP}"
+          echo "   versionMigrationGuide=${MIGRATION_URL}"
+          echo "   versionCurrent=${CURRENT_VERSION}"
 
   verify-deprecation-headers:
     name: Verify Deprecation Headers
-    needs: update-lambda-config
+    needs: update-stage-variables
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS credentials
@@ -220,10 +201,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Wait for Lambda configuration to propagate
+      - name: Wait for stage variable propagation
         run: |
-          echo "⏳ Waiting 10 seconds for Lambda configuration to propagate..."
-          sleep 10
+          echo "⏳ Waiting 5 seconds for stage variables to propagate..."
+          sleep 5
 
       - name: Get OAuth token
         id: auth
@@ -317,7 +298,7 @@ jobs:
           echo "Migration Guide: ${{ github.event.inputs.migration_guide_url }}"
           echo ""
           echo "✅ GitHub Release metadata updated"
-          echo "✅ All Lambda environment variables updated"
+          echo "✅ API Gateway stage variables updated"
           echo "✅ Deprecation headers verified"
           echo ""
           echo "📢 Next Steps:"
