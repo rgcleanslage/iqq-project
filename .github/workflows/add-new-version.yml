@@ -230,18 +230,52 @@ jobs:
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
           API_ID="${{ steps.get-api.outputs.api_id }}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          
           for SERVICE in package lender product document; do
             FUNCTION_NAME="iqq-${SERVICE}-service-dev"
-            STATEMENT_ID="AllowAPIGatewayInvoke${VERSION^^}"
-            aws lambda remove-permission --function-name "$FUNCTION_NAME" \
-              --statement-id "$STATEMENT_ID" --qualifier "$VERSION" 2>/dev/null || true
-            aws lambda add-permission --function-name "$FUNCTION_NAME" \
-              --statement-id "$STATEMENT_ID" --action lambda:InvokeFunction \
+            STATEMENT_ID="apigateway-${VERSION}-invoke"
+            
+            # Remove old permission if exists
+            aws lambda remove-permission \
+              --function-name "${FUNCTION_NAME}:${VERSION}" \
+              --statement-id "$STATEMENT_ID" 2>/dev/null || true
+            
+            # Add permission for the alias
+            aws lambda add-permission \
+              --function-name "${FUNCTION_NAME}:${VERSION}" \
+              --statement-id "$STATEMENT_ID" \
+              --action lambda:InvokeFunction \
               --principal apigateway.amazonaws.com \
-              --source-arn "arn:aws:execute-api:${AWS_REGION}:*:${API_ID}/${VERSION}/GET/${SERVICE}" \
-              --qualifier "$VERSION" 2>/dev/null || echo "⚠️  Permission issue for $FUNCTION_NAME"
+              --source-arn "arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/${VERSION}/*/*" \
+              && echo "✅ Permission added for ${FUNCTION_NAME}:${VERSION}" \
+              || echo "⚠️  Permission issue for ${FUNCTION_NAME}:${VERSION}"
           done
-          echo "✅ Lambda permissions configured"
+          
+      - name: Update usage plans
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          API_ID="${{ steps.get-api.outputs.api_id }}"
+          
+          # Get all usage plans
+          USAGE_PLANS=$(aws apigateway get-usage-plans --query 'items[].id' --output text)
+          
+          for PLAN_ID in $USAGE_PLANS; do
+            PLAN_NAME=$(aws apigateway get-usage-plan --usage-plan-id "$PLAN_ID" --query 'name' --output text)
+            
+            # Check if stage already in plan
+            STAGES=$(aws apigateway get-usage-plan --usage-plan-id "$PLAN_ID" --query 'apiStages[].stage' --output text)
+            
+            if echo "$STAGES" | grep -q "$VERSION"; then
+              echo "ℹ️  Stage $VERSION already in usage plan $PLAN_NAME"
+            else
+              aws apigateway update-usage-plan \
+                --usage-plan-id "$PLAN_ID" \
+                --patch-operations op=add,path=/apiStages,value="${API_ID}:${VERSION}" \
+                && echo "✅ Added $VERSION to usage plan $PLAN_NAME" \
+                || echo "⚠️  Failed to add $VERSION to usage plan $PLAN_NAME"
+            fi
+          done
 
   create-release-branches:
     name: Create Release Branches
