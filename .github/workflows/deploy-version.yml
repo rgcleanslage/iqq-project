@@ -52,6 +52,10 @@ concurrency:
   group: deploy-${{ github.event.inputs.version }}-${{ github.event.inputs.environment }}
   cancel-in-progress: false
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   validate-version:
     name: Validate Version Configuration
