@@ -47,17 +47,18 @@ jobs:
           VERSION="${{ github.event.inputs.version }}"
           ENV="${{ github.event.inputs.environment }}"
           
-          FUNCTION_NAME="iqq-${SERVICE_NAME}-service-${ENV}"
-          STACK_NAME="iqq-${SERVICE_NAME}-service-${ENV}"
+          FUNCTION_NAME="iqq-$SERVICE_NAME-service-$ENV"
+          STACK_NAME="iqq-$SERVICE_NAME-service-$ENV"
           
           echo "function_name=$FUNCTION_NAME" >> $GITHUB_OUTPUT
           echo "stack_name=$STACK_NAME" >> $GITHUB_OUTPUT
           
           echo "📦 Deployment Configuration"
-          echo "   Service: ${SERVICE_NAME}"
+          echo "   Service: $SERVICE_NAME"
           echo "   Version: $VERSION"
           echo "   Environment: $ENV"
           echo "   Function: $FUNCTION_NAME"
+          echo "   Stack: $STACK_NAME"
           echo "   Stack: $STACK_NAME"
       
       - name: Validate version
