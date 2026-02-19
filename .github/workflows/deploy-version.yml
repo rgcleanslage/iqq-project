@@ -46,8 +46,8 @@ jobs:
             SERVICES="package,lender,product,document"
           fi
           
-          # Convert comma-separated list to JSON array
-          SERVICES_JSON=$(echo "$SERVICES" | jq -R 'split(",") | map(select(length > 0))')
+          # Convert comma-separated list to JSON array (compact, no newlines)
+          SERVICES_JSON=$(echo "$SERVICES" | jq -Rc 'split(",") | map(select(length > 0))')
           
           echo "services=$SERVICES_JSON" >> $GITHUB_OUTPUT
           echo "📦 Services to deploy: $SERVICES"
