@@ -21,6 +21,31 @@ on:
         required: false
         type: string
         default: 'https://docs.iqq.com/api/migration'
+      package_branch:
+        description: 'Source branch for package service (default: main)'
+        required: false
+        type: string
+        default: 'main'
+      lender_branch:
+        description: 'Source branch for lender service (default: main)'
+        required: false
+        type: string
+        default: 'main'
+      product_branch:
+        description: 'Source branch for product service (default: main)'
+        required: false
+        type: string
+        default: 'main'
+      document_branch:
+        description: 'Source branch for document service (default: main)'
+        required: false
+        type: string
+        default: 'main'
+      infrastructure_branch:
+        description: 'Source branch for infrastructure (default: main)'
+        required: false
+        type: string
+        default: 'main'
 
 env:
   AWS_REGION: us-east-1
@@ -967,8 +992,31 @@ jobs:
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
           BRANCH_NAME="release/$VERSION"
+          REPO="${{ matrix.repo }}"
           
-          echo "🌿 Creating release branch: $BRANCH_NAME in ${{ matrix.repo }}"
+          # Determine source branch based on repository
+          case "$REPO" in
+            iqq-package-service)
+              SOURCE_BRANCH="${{ github.event.inputs.package_branch }}"
+              ;;
+            iqq-lender-service)
+              SOURCE_BRANCH="${{ github.event.inputs.lender_branch }}"
+              ;;
+            iqq-product-service)
+              SOURCE_BRANCH="${{ github.event.inputs.product_branch }}"
+              ;;
+            iqq-document-service)
+              SOURCE_BRANCH="${{ github.event.inputs.document_branch }}"
+              ;;
+            iqq-infrastructure)
+              SOURCE_BRANCH="${{ github.event.inputs.infrastructure_branch }}"
+              ;;
+            *)
+              SOURCE_BRANCH="main"
+              ;;
+          esac
+          
+          echo "🌿 Creating release branch: $BRANCH_NAME in $REPO from $SOURCE_BRANCH"
           
           # Check if branch already exists on remote
           if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
@@ -976,15 +1024,16 @@ jobs:
             exit 0
           fi
           
-          # Ensure we're on main and it's up to date
-          git checkout main 2>/dev/null || git checkout master 2>/dev/null
-          git pull origin main 2>/dev/null || git pull origin master 2>/dev/null
+          # Fetch and checkout source branch
+          git fetch origin "$SOURCE_BRANCH"
+          git checkout "$SOURCE_BRANCH" 2>/dev/null || git checkout -b "$SOURCE_BRANCH" "origin/$SOURCE_BRANCH"
+          git pull origin "$SOURCE_BRANCH"
           
-          # Create and push branch from main
+          # Create and push release branch from source branch
           git checkout -b "$BRANCH_NAME"
           git push -u origin "$BRANCH_NAME"
           
-          echo "✅ Created and pushed branch $BRANCH_NAME in ${{ matrix.repo }}"
+          echo "✅ Created and pushed branch $BRANCH_NAME in $REPO from $SOURCE_BRANCH"
 
   notify-completion:
     name: Notify Completion
