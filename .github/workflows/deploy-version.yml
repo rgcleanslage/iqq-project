@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - v1
+          - v4
           - v2
       services:
         description: 'Services to deploy (comma-separated or "all")'
@@ -21,6 +22,7 @@ on:
         type: choice
         options:
           - dev
+          - v4
         default: 'dev'
 
 env:
