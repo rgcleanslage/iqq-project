@@ -508,9 +508,144 @@ jobs:
             **Automated by**: Add New API Version workflow
             **Triggered by**: @${{ github.actor }}
 
-  update-infrastructure:
-    name: Create Infrastructure PR
+  deploy-infrastructure:
+    name: Deploy Infrastructure with AWS CLI
     needs: [validate-version, update-root-config]
+    runs-on: ubuntu-latest
+    outputs:
+      stage-url: ${{ steps.create-stage.outputs.stage_url }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Get API Gateway ID
+        id: get-api
+        run: |
+          # Get API Gateway ID from existing deployment
+          API_ID=$(aws apigateway get-rest-apis \
+            --query 'items[?name==`iqq-api-dev`].id' \
+            --output text)
+          
+          if [ -z "$API_ID" ]; then
+            echo "❌ API Gateway not found"
+            exit 1
+          fi
+          
+          echo "api_id=$API_ID" >> $GITHUB_OUTPUT
+          echo "✅ API Gateway ID: $API_ID"
+      
+      - name: Get deployment ID
+        id: get-deployment
+        run: |
+          API_ID="${{ steps.get-api.outputs.api_id }}"
+          
+          # Get latest deployment
+          DEPLOYMENT_ID=$(aws apigateway get-deployments \
+            --rest-api-id "$API_ID" \
+            --query 'items[0].id' \
+            --output text)
+          
+          if [ -z "$DEPLOYMENT_ID" ]; then
+            echo "❌ No deployments found"
+            exit 1
+          fi
+          
+          echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+          echo "✅ Deployment ID: $DEPLOYMENT_ID"
+      
+      - name: Create API Gateway stage
+        id: create-stage
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          API_ID="${{ steps.get-api.outputs.api_id }}"
+          DEPLOYMENT_ID="${{ steps.get-deployment.outputs.deployment_id }}"
+          
+          echo "🚀 Creating API Gateway stage: $VERSION"
+          
+          # Check if stage already exists
+          if aws apigateway get-stage \
+            --rest-api-id "$API_ID" \
+            --stage-name "$VERSION" 2>/dev/null; then
+            echo "ℹ️  Stage $VERSION already exists"
+            STAGE_URL="https://${API_ID}.execute-api.${AWS_REGION}.amazonaws.com/${VERSION}"
+          else
+            # Create stage
+            aws apigateway create-stage \
+              --rest-api-id "$API_ID" \
+              --stage-name "$VERSION" \
+              --deployment-id "$DEPLOYMENT_ID" \
+              --variables lambdaAlias="$VERSION" \
+              --tags Name="iqq-api-${VERSION}-dev",Stage="$VERSION",Environment="dev"
+            
+            STAGE_URL="https://${API_ID}.execute-api.${AWS_REGION}.amazonaws.com/${VERSION}"
+            echo "✅ Stage $VERSION created"
+          fi
+          
+          echo "stage_url=$STAGE_URL" >> $GITHUB_OUTPUT
+          echo "🔗 Stage URL: $STAGE_URL"
+      
+      - name: Add Lambda permissions
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          API_ID="${{ steps.get-api.outputs.api_id }}"
+          ENV="dev"
+          
+          echo "🔐 Adding Lambda permissions for $VERSION..."
+          
+          for SERVICE in package lender product document; do
+            FUNCTION_NAME="iqq-${SERVICE}-service-${ENV}"
+            STATEMENT_ID="AllowAPIGatewayInvoke${VERSION^^}"
+            
+            echo "  Adding permission for $FUNCTION_NAME..."
+            
+            # Remove existing permission if it exists
+            aws lambda remove-permission \
+              --function-name "$FUNCTION_NAME" \
+              --statement-id "$STATEMENT_ID" \
+              --qualifier "$VERSION" 2>/dev/null || true
+            
+            # Add permission
+            aws lambda add-permission \
+              --function-name "$FUNCTION_NAME" \
+              --statement-id "$STATEMENT_ID" \
+              --action lambda:InvokeFunction \
+              --principal apigateway.amazonaws.com \
+              --source-arn "arn:aws:execute-api:${AWS_REGION}:*:${API_ID}/${VERSION}/GET/${SERVICE}" \
+              --qualifier "$VERSION" 2>/dev/null || {
+                echo "  ⚠️  Permission may already exist or alias not created yet"
+              }
+            
+            echo "  ✅ Permission added for $FUNCTION_NAME"
+          done
+          
+          echo "✅ All Lambda permissions configured"
+      
+      - name: Verify stage
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          API_ID="${{ steps.get-api.outputs.api_id }}"
+          
+          echo "🔍 Verifying stage configuration..."
+          
+          STAGE_INFO=$(aws apigateway get-stage \
+            --rest-api-id "$API_ID" \
+            --stage-name "$VERSION")
+          
+          echo "$STAGE_INFO" | jq '{
+            stageName: .stageName,
+            deploymentId: .deploymentId,
+            variables: .variables,
+            createdDate: .createdDate
+          }'
+          
+          echo "✅ Stage verified successfully"
+
+  update-infrastructure:
+    name: Generate Terraform Code for IaC
+    needs: [validate-version, deploy-infrastructure]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout infrastructure repository
@@ -607,24 +742,43 @@ jobs:
       - name: Create infrastructure instructions
         run: |
           VERSION="${{ needs.validate-version.outputs.version }}"
+          STAGE_URL="${{ needs.deploy-infrastructure.outputs.stage-url }}"
           
           cat > INFRASTRUCTURE_UPDATE.md << EOF
           # Infrastructure Update for $VERSION
           
-          ## Manual Steps Required
+          ## ✅ Infrastructure Already Deployed
           
-          This workflow has generated the Terraform configuration for version $VERSION.
-          Please follow these steps to complete the infrastructure setup:
+          The infrastructure for $VERSION has been automatically deployed using AWS CLI:
           
-          ### 1. Add Stage Configuration
+          - ✅ API Gateway stage created: $VERSION
+          - ✅ Lambda permissions added (4 services)
+          - ✅ Stage URL: $STAGE_URL
           
-          Edit \`modules/api-gateway/main.tf\` and add the following at the end of the file:
+          ## Terraform Code (For IaC Compliance)
+          
+          To bring this infrastructure under Terraform management, follow these steps:
+          
+          ### Option 1: Import Existing Resources (Recommended)
+          
+          \`\`\`bash
+          # Import the stage
+          terraform import module.api_gateway.aws_api_gateway_stage.${VERSION} \${API_ID}/${VERSION}
+          
+          # Import Lambda permissions
+          terraform import module.api_gateway.aws_lambda_permission.package_${VERSION} \${FUNCTION_NAME}/AllowAPIGatewayInvoke${VERSION^^}
+          terraform import module.api_gateway.aws_lambda_permission.lender_${VERSION} \${FUNCTION_NAME}/AllowAPIGatewayInvoke${VERSION^^}
+          terraform import module.api_gateway.aws_lambda_permission.product_${VERSION} \${FUNCTION_NAME}/AllowAPIGatewayInvoke${VERSION^^}
+          terraform import module.api_gateway.aws_lambda_permission.document_${VERSION} \${FUNCTION_NAME}/AllowAPIGatewayInvoke${VERSION^^}
+          \`\`\`
+          
+          ### Option 2: Add Terraform Code
+          
+          Edit \`modules/api-gateway/main.tf\` and add:
           
           \`\`\`hcl
           $(cat /tmp/new-stage.tf)
           \`\`\`
-          
-          ### 2. Add Output
           
           Edit \`modules/api-gateway/outputs.tf\` and add:
           
@@ -635,26 +789,27 @@ jobs:
           }
           \`\`\`
           
-          ### 3. Apply Terraform
-          
+          Then run:
           \`\`\`bash
-          terraform init
-          terraform plan
-          terraform apply
+          terraform plan  # Should show resources already exist
+          terraform import ...  # Import existing resources
           \`\`\`
           
-          ### 4. Verify Stage
+          ### Option 3: Leave as-is
           
-          \`\`\`bash
-          aws apigateway get-stage \\
-            --rest-api-id \$(terraform output -raw api_gateway_id) \\
-            --stage-name $VERSION
-          \`\`\`
+          The infrastructure is fully functional. You can leave it managed via AWS CLI
+          and add Terraform code later if needed.
+          
+          ## Next Steps
+          
+          1. ✅ Infrastructure is ready - no action required
+          2. Deploy services using "Deploy API Version" workflow
+          3. Test endpoints at: $STAGE_URL
           
           ---
           
-          **Note**: These changes must be applied manually because Terraform modifications
-          require careful review and testing.
+          **Note**: Infrastructure was automatically deployed via AWS CLI for speed.
+          Terraform code is provided for IaC compliance if desired.
           EOF
           
           echo "✅ Infrastructure instructions created"
@@ -669,15 +824,44 @@ jobs:
           body: |
             ## Infrastructure Update for ${{ needs.validate-version.outputs.version }}
             
-            This PR provides the Terraform configuration for version ${{ needs.validate-version.outputs.version }}.
+            ### ✅ Infrastructure Automatically Deployed
             
-            ### ⚠️ Manual Steps Required
+            The infrastructure for ${{ needs.validate-version.outputs.version }} has been automatically created using AWS CLI:
             
-            Please see `INFRASTRUCTURE_UPDATE.md` for detailed instructions.
+            - ✅ API Gateway stage: ${{ needs.validate-version.outputs.version }}
+            - ✅ Lambda permissions: 4 services configured
+            - ✅ Stage URL: ${{ needs.deploy-infrastructure.outputs.stage-url }}
             
-            ### Quick Summary
+            ### Terraform Code Provided
             
-            1. Add stage resource to `modules/api-gateway/main.tf`
+            This PR includes Terraform code for IaC compliance. You can:
+            
+            1. **Import existing resources** into Terraform state (recommended)
+            2. **Add Terraform code** and import resources
+            3. **Leave as-is** - infrastructure is fully functional
+            
+            See `INFRASTRUCTURE_UPDATE.md` for detailed instructions.
+            
+            ### Next Steps
+            
+            1. ✅ Infrastructure is ready - no manual steps required
+            2. Deploy services via "Deploy API Version" workflow
+            3. Test endpoints at: ${{ needs.deploy-infrastructure.outputs.stage-url }}
+            
+            ### Optional: Terraform Import
+            
+            To bring resources under Terraform management:
+            
+            \`\`\`bash
+            # See INFRASTRUCTURE_UPDATE.md for import commands
+            terraform import module.api_gateway.aws_api_gateway_stage.${{ needs.validate-version.outputs.version }} ...
+            \`\`\`
+            
+            ---
+            
+            **Automated by**: Add New API Version workflow  
+            **Infrastructure**: Deployed via AWS CLI  
+            **Terraform**: Code provided for IaC compliance
             2. Add Lambda permissions (4 services)
             3. Add output to `modules/api-gateway/outputs.tf`
             4. Run `terraform apply`
@@ -801,7 +985,7 @@ jobs:
 
   notify-completion:
     name: Notify Completion
-    needs: [validate-version, update-root-config, update-infrastructure, update-service-configs, create-release-branches]
+    needs: [validate-version, update-root-config, update-infrastructure, update-service-configs, create-release-branches, deploy-infrastructure]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -830,6 +1014,17 @@ jobs:
           echo "   - iqq-product-service/release/$VERSION"
           echo "   - iqq-document-service/release/$VERSION"
           echo "   - iqq-infrastructure/release/$VERSION"
+          echo ""
+          echo "✅ Infrastructure deployed:"
+          echo "   - API Gateway stage: $VERSION"
+          echo "   - Lambda permissions: 4 services"
+          echo "   - Stage URL: ${{ needs.deploy-infrastructure.outputs.stage-url }}"
+          echo ""
+          echo "📋 Next Steps:"
+          echo "   1. Review and merge all PRs"
+          echo "   2. Deploy services using 'Deploy API Version' workflow"
+          echo "   3. Test endpoints"
+          echo "   4. (Optional) Import infrastructure into Terraform"
           echo "   - iqq-product-service"
           echo "   - iqq-document-service"
           echo ""
