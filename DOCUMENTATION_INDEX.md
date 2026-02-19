@@ -92,9 +92,9 @@ Complete index of all documentation for the iQQ Insurance Quoting Platform.
 - **[docs/api/SETUP_QUICK_START.md](docs/api/SETUP_QUICK_START.md)** - Quick start setup guide
 
 ### Postman Collections
-- **[docs/api/postman-collection.json](docs/api/postman-collection.json)** - Postman collection
-- **[docs/api/postman-collection-fixed.json](docs/api/postman-collection-fixed.json)** - Fixed Postman collection with OAuth
-- **[docs/api/POSTMAN_STEP_BY_STEP.md](docs/api/POSTMAN_STEP_BY_STEP.md)** - Step-by-step Postman setup
+- **[docs/api/postman-collection-versioned.json](docs/api/postman-collection-versioned.json)** - Versioned Postman collection (v1-v9)
+- **[docs/api/POSTMAN_VERSIONED_SETUP.md](docs/api/POSTMAN_VERSIONED_SETUP.md)** - Setup guide for versioned collection
+- **[docs/api/POSTMAN_STEP_BY_STEP.md](docs/api/POSTMAN_STEP_BY_STEP.md)** - Step-by-step Postman setup (legacy)
 - **[docs/api/POSTMAN_CLIENT_SETUP.md](docs/api/POSTMAN_CLIENT_SETUP.md)** - Postman client setup
 - **[docs/api/POSTMAN_CLIENT_PREFERENCES.md](docs/api/POSTMAN_CLIENT_PREFERENCES.md)** - Postman client preferences
 - **[docs/api/POSTMAN_TROUBLESHOOTING.md](docs/api/POSTMAN_TROUBLESHOOTING.md)** - Postman troubleshooting guide

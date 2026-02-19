@@ -7,8 +7,8 @@ Complete API documentation for the iQQ Insurance Quote system with versioning su
 - [OpenAPI Specification](./openapi-complete.yaml) - Complete API spec with OAuth endpoint
 - [Usage Guide](./OPENAPI_USAGE_GUIDE.md) - Detailed usage instructions
 - [Version Headers](./API_VERSION_HEADERS.md) - API versioning documentation
-- [Postman Collection](./postman-collection-fixed.json) - Import into Postman
-- [Postman Setup Guide](./POSTMAN_STEP_BY_STEP.md) - Step-by-step Postman configuration
+- [Postman Collection](./postman-collection-versioned.json) - Versioned collection (v1-v9)
+- [Postman Setup Guide](./POSTMAN_VERSIONED_SETUP.md) - Complete setup guide for versioned collection
 - [Postman Troubleshooting](./POSTMAN_TROUBLESHOOTING.md) - Fix common Postman issues
 - [Credential Encoder](./credential-encoder.html) - Web tool to encode credentials
 - [Secrets Management](./SECRETS_MANAGEMENT.md) - How secrets are managed
@@ -69,14 +69,16 @@ curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/v1/package?p
 
 ### 4. Using Postman
 
-1. Import `postman-collection-fixed.json` into Postman
+1. Import `postman-collection-versioned.json` into Postman
 2. Import one of the environment templates:
    - `postman-environment-default.template.json`
    - `postman-environment-partner-a.template.json`
    - `postman-environment-partner-b.template.json`
 3. Update `clientSecret` and `apiKey` in environment variables
 4. Use "Get OAuth Token" request to authenticate
-5. Test endpoints (token auto-refreshes)
+5. Test endpoints across different versions (v1-v9)
+
+**Complete Setup Guide:** See [POSTMAN_VERSIONED_SETUP.md](./POSTMAN_VERSIONED_SETUP.md)
 
 **Having issues?** See [Postman Troubleshooting Guide](./POSTMAN_TROUBLESHOOTING.md)
 
