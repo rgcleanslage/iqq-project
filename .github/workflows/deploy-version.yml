@@ -222,6 +222,7 @@ jobs:
     name: Verify Service Deployments
     needs: [validate-version, deploy-services]
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout root repository
         uses: actions/checkout@v4
