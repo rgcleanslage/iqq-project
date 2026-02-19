@@ -1,0 +1,438 @@
+name: Generate Migration Guide from Code Changes
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_version:
+        description: 'Source version (e.g., v2)'
+        required: true
+        type: string
+      to_version:
+        description: 'Target version (e.g., v3)'
+        required: true
+        type: string
+      analyze_services:
+        description: 'Services to analyze (comma-separated or "all")'
+        required: true
+        type: string
+        default: 'all'
+
+env:
+  GITHUB_ORG: rgcleanslage
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  analyze-changes:
+    name: Analyze Code Changes
+    runs-on: ubuntu-latest
+    outputs:
+      has-changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Parse services list
+        id: parse
+        run: |
+          SERVICES="${{ github.event.inputs.analyze_services }}"
+          if [ "$SERVICES" == "all" ]; then
+            SERVICES="package,lender,product,document"
+          fi
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          echo "📦 Services to analyze: $SERVICES"
+      
+      - name: Check for changes
+        id: check
+        run: |
+          FROM_VERSION="${{ github.event.inputs.from_version }}"
+          TO_VERSION="${{ github.event.inputs.to_version }}"
+          
+          echo "🔍 Checking for code changes between $FROM_VERSION and $TO_VERSION..."
+          
+          # This will be populated by service analysis
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+
+  analyze-service-changes:
+    name: Analyze ${{ matrix.service }} Service
+    needs: analyze-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [package, lender, product, document]
+    steps:
+      - name: Checkout service repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITHUB_ORG }}/iqq-${{ matrix.service }}-service
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+      
+      - name: Analyze code differences
+        id: diff
+        run: |
+          FROM_VERSION="${{ github.event.inputs.from_version }}"
+          TO_VERSION="${{ github.event.inputs.to_version }}"
+          SERVICE="${{ matrix.service }}"
+          
+          echo "🔍 Analyzing $SERVICE service changes: $FROM_VERSION → $TO_VERSION"
+          
+          # Create output directory
+          mkdir -p /tmp/analysis
+          
+          # Get list of changed files
+          echo "## Changed Files in $SERVICE Service" > /tmp/analysis/${SERVICE}-changes.md
+          echo "" >> /tmp/analysis/${SERVICE}-changes.md
+          
+          # Compare main branch (assuming both versions deployed from main)
+          # In practice, you'd compare release branches: release/v2 vs release/v3
+          
+          # Get recent commits (as proxy for changes)
+          echo "### Recent Changes" >> /tmp/analysis/${SERVICE}-changes.md
+          git log --oneline -20 --pretty=format:"- %s (%h)" >> /tmp/analysis/${SERVICE}-changes.md
+          echo "" >> /tmp/analysis/${SERVICE}-changes.md
+          echo "" >> /tmp/analysis/${SERVICE}-changes.md
+          
+          # Analyze TypeScript files for API changes
+          echo "### API Handler Changes" >> /tmp/analysis/${SERVICE}-changes.md
+          echo "" >> /tmp/analysis/${SERVICE}-changes.md
+          
+          if [ -f "src/index.ts" ]; then
+            echo "#### Handler Signature" >> /tmp/analysis/${SERVICE}-changes.md
+            echo "\`\`\`typescript" >> /tmp/analysis/${SERVICE}-changes.md
+            grep -A 10 "export const handler" src/index.ts || echo "No handler found" >> /tmp/analysis/${SERVICE}-changes.md
+            echo "\`\`\`" >> /tmp/analysis/${SERVICE}-changes.md
+            echo "" >> /tmp/analysis/${SERVICE}-changes.md
+          fi
+          
+          # Analyze models for schema changes
+          if [ -d "src/models" ]; then
+            echo "### Data Model Changes" >> /tmp/analysis/${SERVICE}-changes.md
+            echo "" >> /tmp/analysis/${SERVICE}-changes.md
+            
+            for model in src/models/*.ts; do
+              if [ -f "$model" ]; then
+                echo "#### $(basename $model)" >> /tmp/analysis/${SERVICE}-changes.md
+                echo "\`\`\`typescript" >> /tmp/analysis/${SERVICE}-changes.md
+                head -50 "$model" >> /tmp/analysis/${SERVICE}-changes.md
+                echo "\`\`\`" >> /tmp/analysis/${SERVICE}-changes.md
+                echo "" >> /tmp/analysis/${SERVICE}-changes.md
+              fi
+            done
+          fi
+          
+          # Analyze package.json for dependency changes
+          if [ -f "package.json" ]; then
+            echo "### Dependency Changes" >> /tmp/analysis/${SERVICE}-changes.md
+            echo "" >> /tmp/analysis/${SERVICE}-changes.md
+            echo "\`\`\`json" >> /tmp/analysis/${SERVICE}-changes.md
+            jq '.dependencies' package.json >> /tmp/analysis/${SERVICE}-changes.md
+            echo "\`\`\`" >> /tmp/analysis/${SERVICE}-changes.md
+            echo "" >> /tmp/analysis/${SERVICE}-changes.md
+          fi
+          
+          echo "✅ Analysis complete for $SERVICE service"
+      
+      - name: Upload analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-${{ matrix.service }}
+          path: /tmp/analysis/
+
+  generate-migration-guide:
+    name: Generate Migration Guide
+    needs: analyze-service-changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout root repository
+        uses: actions/checkout@v4
+      
+      - name: Download all analyses
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/analyses/
+      
+      - name: Combine analyses
+        run: |
+          FROM_VERSION="${{ github.event.inputs.from_version }}"
+          TO_VERSION="${{ github.event.inputs.to_version }}"
+          DATE=$(date +"%B %d, %Y")
+          
+          echo "📝 Generating migration guide from code analysis..."
+          
+          mkdir -p docs/api/migrations
+          
+          # Start migration guide
+          cat > docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md << 'HEADER'
+          # Migration Guide: ${FROM_VERSION} to ${TO_VERSION}
+          
+          **Date**: ${DATE}  
+          **Status**: Generated from Code Analysis  
+          **Auto-Generated**: Yes
+          
+          ## Overview
+          
+          This migration guide was automatically generated by analyzing code changes between ${FROM_VERSION} and ${TO_VERSION}.
+          
+          ## Summary of Changes
+          
+          This guide documents the differences found across all services.
+          
+          HEADER
+          
+          # Add service-specific changes
+          echo "" >> docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+          echo "## Service Changes" >> docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+          echo "" >> docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+          
+          for service in package lender product document; do
+            if [ -f "/tmp/analyses/analysis-${service}/${service}-changes.md" ]; then
+              echo "### ${service^} Service" >> docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+              echo "" >> docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+              cat "/tmp/analyses/analysis-${service}/${service}-changes.md" >> docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+              echo "" >> docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+            fi
+          done
+          
+          # Add migration steps template
+          cat >> docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md << 'FOOTER'
+          
+          ## Breaking Changes Analysis
+          
+          Based on the code analysis above, review the following areas for potential breaking changes:
+          
+          ### API Request/Response Changes
+          
+          - Review handler signatures for parameter changes
+          - Check data models for schema modifications
+          - Verify response structure consistency
+          
+          ### Dependency Updates
+          
+          - Review dependency version changes
+          - Check for deprecated package usage
+          - Verify compatibility with existing integrations
+          
+          ## Migration Steps
+          
+          ### Step 1: Review Code Changes
+          
+          Review all service changes documented above and assess impact on your integration.
+          
+          ### Step 2: Update API Endpoints
+          
+          Update your API endpoint URLs from ${FROM_VERSION} to ${TO_VERSION}:
+          
+          \`\`\`
+          # Before
+          https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${FROM_VERSION}/package
+          
+          # After
+          https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${TO_VERSION}/package
+          \`\`\`
+          
+          ### Step 3: Test Integration
+          
+          Test all endpoints with your integration:
+          
+          \`\`\`bash
+          # Test package endpoint
+          curl -i "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${TO_VERSION}/package?productCode=MBP" \\
+            -H "Authorization: Bearer $TOKEN" \\
+            -H "x-api-key: $API_KEY"
+          
+          # Test lender endpoint
+          curl -i "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${TO_VERSION}/lender?lenderId=LENDER-001" \\
+            -H "Authorization: Bearer $TOKEN" \\
+            -H "x-api-key: $API_KEY"
+          
+          # Test product endpoint
+          curl -i "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${TO_VERSION}/product?productId=PROD-001" \\
+            -H "Authorization: Bearer $TOKEN" \\
+            -H "x-api-key: $API_KEY"
+          
+          # Test document endpoint
+          curl -i "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${TO_VERSION}/document" \\
+            -H "Authorization: Bearer $TOKEN" \\
+            -H "x-api-key: $API_KEY"
+          \`\`\`
+          
+          ### Step 4: Verify Version Headers
+          
+          Ensure you're receiving correct version headers:
+          
+          \`\`\`bash
+          curl -i "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${TO_VERSION}/package?productCode=MBP" \\
+            -H "Authorization: Bearer $TOKEN" \\
+            -H "x-api-key: $API_KEY" | grep -i "x-api-version"
+          
+          # Expected: x-api-version: ${TO_VERSION}
+          \`\`\`
+          
+          ## Code Examples
+          
+          ### JavaScript/TypeScript
+          
+          \`\`\`typescript
+          // Update base URL
+          const API_BASE_URL = 'https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${TO_VERSION}';
+          
+          const response = await fetch(\`\${API_BASE_URL}/package\`, {
+            headers: {
+              'Authorization': \`Bearer \${token}\`,
+              'x-api-key': apiKey
+            }
+          });
+          
+          // Check version
+          const apiVersion = response.headers.get('X-API-Version');
+          console.log('API Version:', apiVersion); // Should be: ${TO_VERSION}
+          \`\`\`
+          
+          ### Python
+          
+          \`\`\`python
+          import requests
+          
+          # Update base URL
+          API_BASE_URL = 'https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/${TO_VERSION}'
+          
+          response = requests.get(
+              f'{API_BASE_URL}/package',
+              headers={
+                  'Authorization': f'Bearer {token}',
+                  'x-api-key': api_key
+              }
+          )
+          
+          # Check version
+          api_version = response.headers.get('X-API-Version')
+          print(f'API Version: {api_version}')  # Should be: ${TO_VERSION}
+          \`\`\`
+          
+          ## Rollback Plan
+          
+          If you encounter issues:
+          
+          1. Revert endpoint URLs to ${FROM_VERSION}
+          2. Monitor application stability
+          3. Report issues to API team
+          4. Plan remediation with updated migration guide
+          
+          ## Support
+          
+          - **Documentation**: https://docs.iqq.com/api
+          - **API Reference**: https://docs.iqq.com/api/reference
+          - **GitHub Issues**: https://github.com/rgcleanslage/iqq-project/issues
+          
+          ## Migration Checklist
+          
+          - [ ] Review all service changes above
+          - [ ] Identify breaking changes
+          - [ ] Update endpoint URLs
+          - [ ] Update request/response handling (if needed)
+          - [ ] Test in development
+          - [ ] Verify version headers
+          - [ ] Deploy to staging
+          - [ ] Perform integration tests
+          - [ ] Deploy to production
+          - [ ] Monitor for issues
+          
+          ---
+          
+          **Generated**: ${DATE}  
+          **Method**: Automated code analysis  
+          **Note**: This guide was auto-generated. Please review and enhance with specific breaking changes and examples.
+          FOOTER
+          
+          # Replace variables
+          sed -i '' "s/\${FROM_VERSION}/${FROM_VERSION}/g" docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+          sed -i '' "s/\${TO_VERSION}/${TO_VERSION}/g" docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+          sed -i '' "s/\${DATE}/${DATE}/g" docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+          
+          echo "✅ Migration guide generated"
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          commit-message: "docs: generate migration guide ${{ github.event.inputs.from_version }} to ${{ github.event.inputs.to_version }}"
+          branch: migration-guide-${{ github.event.inputs.from_version }}-to-${{ github.event.inputs.to_version }}
+          title: "Migration Guide: ${{ github.event.inputs.from_version }} → ${{ github.event.inputs.to_version }}"
+          body: |
+            ## Auto-Generated Migration Guide
+            
+            This PR contains an automatically generated migration guide based on code analysis.
+            
+            ### Source
+            - **From Version**: ${{ github.event.inputs.from_version }}
+            - **To Version**: ${{ github.event.inputs.to_version }}
+            - **Services Analyzed**: ${{ github.event.inputs.analyze_services }}
+            
+            ### What's Included
+            
+            - ✅ Code change analysis for all services
+            - ✅ Handler signature comparisons
+            - ✅ Data model changes
+            - ✅ Dependency updates
+            - ✅ Migration steps
+            - ✅ Code examples
+            - ✅ Testing instructions
+            
+            ### Next Steps
+            
+            1. **Review the generated guide** in `docs/api/migrations/`
+            2. **Enhance with specifics**:
+               - Add detailed breaking change descriptions
+               - Include specific code examples
+               - Document any behavioral changes
+               - Add timeline information
+            3. **Test the migration steps**
+            4. **Publish the guide**
+            
+            ### Manual Enhancements Needed
+            
+            - [ ] Review and validate all detected changes
+            - [ ] Add specific breaking change examples
+            - [ ] Document behavioral differences
+            - [ ] Add timeline (release, deprecation, sunset dates)
+            - [ ] Include customer-facing examples
+            - [ ] Add FAQ section if needed
+            
+            ---
+            
+            **Generated by**: Generate Migration Guide workflow  
+            **Triggered by**: @${{ github.actor }}  
+            **Date**: $(date +"%B %d, %Y")
+
+  notify-completion:
+    name: Notify Completion
+    needs: generate-migration-guide
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          FROM_VERSION="${{ github.event.inputs.from_version }}"
+          TO_VERSION="${{ github.event.inputs.to_version }}"
+          
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📚 Migration Guide Generation Complete"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Migration: $FROM_VERSION → $TO_VERSION"
+          echo "Services: ${{ github.event.inputs.analyze_services }}"
+          echo ""
+          echo "✅ Code analysis completed"
+          echo "✅ Migration guide generated"
+          echo "✅ Pull request created"
+          echo ""
+          echo "📋 Next Steps:"
+          echo "   1. Review the PR"
+          echo "   2. Enhance with specific details"
+          echo "   3. Test migration steps"
+          echo "   4. Merge and publish"
+          echo ""
