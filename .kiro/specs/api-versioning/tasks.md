@@ -98,16 +98,18 @@ Implement stage-based API versioning for the iQQ Insurance Quoting Platform usin
     - _Requirements: AC-2.3_
     - _Status: ✅ Complete_
 
-- [ ] 5. Create release branches
-  - [ ] 5.1 Create v1 release branch
+- [x] 5. Create release branches
+  - [x] 5.1 Create v1 release branch
     - Create `release/v1` branch from main in each service repo
     - Push to remote
     - _Requirements: AC-2.1_
+    - _Status: ✅ Complete - Branches created in all 5 repositories_
   
-  - [ ] 5.2 Create v2 release branch
+  - [x] 5.2 Create v2 release branch
     - Create `release/v2` branch from main in each service repo
     - Push to remote
     - _Requirements: AC-2.1_
+    - _Status: ✅ Complete - Branches created in all 5 repositories_
 
 - [ ] 6. Deploy initial versions
   - [ ] 6.1 Deploy v1 to Lambda
