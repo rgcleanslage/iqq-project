@@ -174,7 +174,7 @@ jobs:
           sam deploy \
             --stack-name "$STACK_NAME" \
             --s3-bucket "${{ secrets.SAM_DEPLOYMENT_BUCKET }}" \
-            --s3-prefix "iqq-${SERVICE_NAME}-service" \
+            --s3-prefix "iqq-$SERVICE_NAME-service" \
             --capabilities CAPABILITY_IAM \
             --no-fail-on-empty-changeset \
             --parameter-overrides "Environment=$ENV" \
