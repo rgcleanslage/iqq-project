@@ -4,13 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to sunset (v1, v2)'
+        description: 'Version to sunset (e.g., v1, v2)'
         required: true
-        type: choice
-        options:
-          - v1
-          - v4
-          - v2
+        type: string
       confirm:
         description: 'Type "CONFIRM" to proceed with sunset'
         required: true
@@ -24,6 +20,10 @@ concurrency:
   group: sunset-${{ github.event.inputs.version }}
   cancel-in-progress: false
 
+permissions:
+  id-token: write
+  contents: write
+
 jobs:
   validate-sunset:
     name: Validate Sunset Request
@@ -34,67 +34,65 @@ jobs:
     steps:
       - name: Checkout root repository
         uses: actions/checkout@v4
-      
+
       - name: Validate confirmation
         run: |
-          CONFIRM="${{ github.event.inputs.confirm }}"
-          
-          if [ "$CONFIRM" != "CONFIRM" ]; then
-            echo "❌ Sunset not confirmed"
-            echo "   Please type 'CONFIRM' to proceed"
+          if [ "${{ github.event.inputs.confirm }}" != "CONFIRM" ]; then
+            echo "❌ Sunset not confirmed. Please type 'CONFIRM' to proceed."
             exit 1
           fi
-          
-          echo "✅ Sunset confirmed"
-      
-      - name: Validate sunset request
+
+      - name: Validate sunset request from releases
         id: validate
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          
+
           echo "🔍 Validating sunset request for $VERSION"
-          
-          # Check if version exists
-          if ! jq -e ".versions[\"$VERSION\"]" config/version-policy.json > /dev/null; then
-            echo "❌ Version $VERSION not found in configuration"
+
+          # Check if release exists
+          RELEASE_BODY=$(gh release view "api-${VERSION}" --json body --jq '.body' 2>/dev/null)
+          if [ -z "$RELEASE_BODY" ]; then
+            echo "❌ Version $VERSION not found as a GitHub Release"
             exit 1
           fi
-          
-          # Get version status
-          STATUS=$(jq -r ".versions[\"$VERSION\"].status" config/version-policy.json)
+
+          # Extract status from release metadata
+          STATUS=$(echo "$RELEASE_BODY" | sed -n '/```json/,/```/p' | sed '1d;$d' | jq -r '.status')
           echo "status=$STATUS" >> $GITHUB_OUTPUT
-          
-          # Get current version
-          CURRENT_VERSION=$(jq -r '.currentVersion' config/version-policy.json)
+
+          # Find current stable version
+          CURRENT_VERSION=$(gh release list --json tagName,body --limit 100 | \
+            jq -r '[.[] | select(.tagName | startswith("api-")) |
+              {tag: .tagName, version: (.tagName | ltrimstr("api-")), body: .body} |
+              select(.body | contains("\"status\":\"stable\"") or contains("\"status\": \"stable\""))] |
+              sort_by(.version) | last | .version // "v1"')
+
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          
-          # Cannot sunset current version
+
           if [ "$VERSION" == "$CURRENT_VERSION" ]; then
-            echo "❌ Cannot sunset current version $VERSION"
+            echo "❌ Cannot sunset current stable version $VERSION"
             exit 1
           fi
-          
-          # Version should be deprecated before sunset
+
           if [ "$STATUS" != "deprecated" ]; then
             echo "⚠️  Warning: Version $VERSION is not deprecated (status: $STATUS)"
             echo "   Recommended: Deprecate version before sunset"
           fi
-          
+
           # Check if sunset date has passed
-          SUNSET_DATE=$(jq -r ".versions[\"$VERSION\"].sunsetDate" config/version-policy.json)
-          if [ "$SUNSET_DATE" != "null" ]; then
+          SUNSET_DATE=$(echo "$RELEASE_BODY" | sed -n '/```json/,/```/p' | sed '1d;$d' | jq -r '.sunsetDate')
+          if [ "$SUNSET_DATE" != "null" ] && [ "$SUNSET_DATE" != "" ]; then
             CURRENT_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             if [[ "$SUNSET_DATE" > "$CURRENT_TIMESTAMP" ]]; then
-              echo "⚠️  Warning: Sunset date has not passed yet"
-              echo "   Sunset date: $SUNSET_DATE"
-              echo "   Current time: $CURRENT_TIMESTAMP"
+              echo "⚠️  Warning: Sunset date has not passed yet ($SUNSET_DATE)"
             fi
           fi
-          
+
           echo "✅ Sunset request validated"
-          echo "   Version: $VERSION"
-          echo "   Status: $STATUS"
-          echo "   Current version: $CURRENT_VERSION"
+          echo "   Version: $VERSION (status: $STATUS)"
+          echo "   Current stable: $CURRENT_VERSION"
 
   check-usage:
     name: Check Version Usage
@@ -106,27 +104,15 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-      
+
       - name: Check CloudWatch metrics
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          
           echo "📊 Checking usage metrics for version $VERSION"
-          
-          # Get API Gateway metrics for the last 7 days
-          END_TIME=$(date -u +%Y-%m-%dT%H:%M:%S)
-          START_TIME=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%S)
-          
-          echo "   Period: $START_TIME to $END_TIME"
-          
-          # Note: This is a simplified check
-          # In production, you would query CloudWatch metrics for actual usage
-          
           echo "⚠️  Manual verification recommended:"
           echo "   1. Check CloudWatch metrics for /$VERSION/* requests"
           echo "   2. Review API Gateway access logs"
           echo "   3. Confirm with API consumers"
-          echo ""
           echo "   Proceeding with sunset..."
 
   remove-api-gateway-stage:
@@ -139,58 +125,42 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-      
+
       - name: Get API Gateway ID
         id: get-api
         run: |
-          # Get API Gateway ID from existing deployment
           API_ID=$(aws apigateway get-rest-apis \
-            --query 'items[?name==`iqq-api-dev`].id' \
-            --output text)
-          
+            --query 'items[?name==`iqq-api-dev`].id' --output text)
+
           if [ -z "$API_ID" ]; then
             echo "❌ API Gateway not found"
             exit 1
           fi
-          
+
           echo "api_id=$API_ID" >> $GITHUB_OUTPUT
-          echo "✅ API Gateway ID: $API_ID"
-      
+
       - name: Remove API Gateway stage
         run: |
           VERSION="${{ github.event.inputs.version }}"
           API_ID="${{ steps.get-api.outputs.api_id }}"
-          
-          echo "🗑️  Removing API Gateway stage: $VERSION"
-          
-          # Check if stage exists
-          if ! aws apigateway get-stage \
-            --rest-api-id "$API_ID" \
-            --stage-name "$VERSION" 2>/dev/null; then
+
+          if ! aws apigateway get-stage --rest-api-id "$API_ID" --stage-name "$VERSION" 2>/dev/null; then
             echo "ℹ️  Stage $VERSION does not exist"
             exit 0
           fi
-          
-          # Delete the stage
-          aws apigateway delete-stage \
-            --rest-api-id "$API_ID" \
-            --stage-name "$VERSION"
-          
+
+          aws apigateway delete-stage --rest-api-id "$API_ID" --stage-name "$VERSION"
           echo "✅ API Gateway stage $VERSION removed"
-      
+
       - name: Verify stage removal
         run: |
           VERSION="${{ github.event.inputs.version }}"
           API_ID="${{ steps.get-api.outputs.api_id }}"
-          
-          # Verify stage is gone
-          if aws apigateway get-stage \
-            --rest-api-id "$API_ID" \
-            --stage-name "$VERSION" 2>/dev/null; then
+
+          if aws apigateway get-stage --rest-api-id "$API_ID" --stage-name "$VERSION" 2>/dev/null; then
             echo "❌ Stage $VERSION still exists"
             exit 1
           fi
-          
           echo "✅ Stage removal verified"
 
   cleanup-lambda-aliases:
@@ -207,155 +177,95 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-      
+
       - name: Remove Lambda alias
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          SERVICE="${{ matrix.service }}"
-          FUNCTION_NAME="iqq-${SERVICE}-service-dev"
-          
-          echo "🗑️  Removing Lambda alias $VERSION from $FUNCTION_NAME"
-          
-          # Check if alias exists
-          if ! aws lambda get-alias \
-            --function-name "$FUNCTION_NAME" \
-            --name "$VERSION" 2>/dev/null; then
+          FUNCTION_NAME="iqq-${{ matrix.service }}-service-dev"
+
+          if ! aws lambda get-alias --function-name "$FUNCTION_NAME" --name "$VERSION" 2>/dev/null; then
             echo "ℹ️  Alias $VERSION does not exist for $FUNCTION_NAME"
             exit 0
           fi
-          
-          # Delete the alias
-          aws lambda delete-alias \
-            --function-name "$FUNCTION_NAME" \
-            --name "$VERSION"
-          
-          echo "✅ Lambda alias $VERSION removed from $FUNCTION_NAME"
-      
-      - name: Verify alias removal
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          SERVICE="${{ matrix.service }}"
-          FUNCTION_NAME="iqq-${SERVICE}-service-dev"
-          
-          # Verify alias is gone
-          if aws lambda get-alias \
-            --function-name "$FUNCTION_NAME" \
-            --name "$VERSION" 2>/dev/null; then
-            echo "❌ Alias $VERSION still exists for $FUNCTION_NAME"
-            exit 1
-          fi
-          
-          echo "✅ Alias removal verified for $FUNCTION_NAME"
 
-  update-version-policy:
-    name: Update Version Policy
+          aws lambda delete-alias --function-name "$FUNCTION_NAME" --name "$VERSION"
+          echo "✅ Lambda alias $VERSION removed from $FUNCTION_NAME"
+
+  update-release-metadata:
+    name: Update Release to Sunset
     needs: cleanup-lambda-aliases
     runs-on: ubuntu-latest
     steps:
       - name: Checkout root repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.PAT_TOKEN }}
-      
-      - name: Update version policy
+
+      - name: Update GitHub Release metadata
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           VERSION="${{ github.event.inputs.version }}"
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          
-          echo "📝 Updating version policy..."
-          
-          # Update version status to sunset
-          jq --arg version "$VERSION" \
-             --arg timestamp "$TIMESTAMP" \
-             '.versions[$version].status = "sunset" |
-              .versions[$version].sunsetAt = $timestamp' \
-             config/version-policy.json > config/version-policy.json.tmp
-          
-          mv config/version-policy.json.tmp config/version-policy.json
-          
-          echo "✅ Version policy updated"
-          cat config/version-policy.json | jq ".versions[\"$VERSION\"]"
-      
-      - name: Commit and push changes
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add config/version-policy.json
-          git commit -m "chore: sunset version $VERSION"
-          git push
-          
-          echo "✅ Changes committed and pushed"
+
+          RELEASE_BODY=$(gh release view "api-${VERSION}" --json body --jq '.body')
+
+          # Update status to sunset in JSON metadata
+          UPDATED_BODY=$(echo "$RELEASE_BODY" | \
+            sed "s/\"status\": *\"[^\"]*\"/\"status\": \"sunset\"/" | \
+            sed "s/\*\*Status\*\*: *[a-zA-Z]*/\*\*Status\*\*: sunset/")
+
+          gh release edit "api-${VERSION}" --notes "$UPDATED_BODY"
+
+          echo "✅ Release api-${VERSION} updated to sunset"
 
   archive-documentation:
     name: Archive Version Documentation
-    needs: update-version-policy
+    needs: update-release-metadata
     runs-on: ubuntu-latest
     steps:
       - name: Checkout root repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN }}
-      
-      - name: Create archive directory
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          ARCHIVE_DIR="docs/api/archive/$VERSION"
-          
-          mkdir -p "$ARCHIVE_DIR"
-          
-          echo "📦 Creating documentation archive for $VERSION"
-          echo "   Directory: $ARCHIVE_DIR"
-      
+
       - name: Archive version documentation
         run: |
           VERSION="${{ github.event.inputs.version }}"
           ARCHIVE_DIR="docs/api/archive/$VERSION"
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          
-          # Create archive README
+
+          mkdir -p "$ARCHIVE_DIR"
+
           cat > "$ARCHIVE_DIR/README.md" << EOF
           # API Version $VERSION - Archived
-          
-          **Status**: Sunset  
-          **Sunset Date**: $TIMESTAMP  
+
+          **Status**: Sunset
+          **Sunset Date**: $TIMESTAMP
           **Current Version**: ${{ needs.validate-sunset.outputs.current-version }}
-          
+
           This version has been sunset and is no longer available.
-          
-          ## Migration
-          
           Please migrate to version ${{ needs.validate-sunset.outputs.current-version }}.
-          
-          See migration guide: [Migration Guide](../../MIGRATION_V1_TO_V2.md)
-          
-          ## Historical Information
-          
-          This directory contains archived documentation for version $VERSION.
-          
+
           ---
-          
           Archived: $TIMESTAMP
           EOF
-          
+
           echo "✅ Archive documentation created"
-      
+
       - name: Commit archive
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          
+
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add docs/api/archive/
           git commit -m "docs: archive version $VERSION documentation"
           git push
-          
+
           echo "✅ Archive committed"
 
   notify-completion:
     name: Notify Completion
-    needs: archive-documentation
+    needs: [validate-sunset, archive-documentation]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -363,25 +273,18 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           CURRENT_VERSION="${{ needs.validate-sunset.outputs.current-version }}"
-          
+
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "🌅 API Version Sunset Complete"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
           echo "Sunset Version: $VERSION"
-          echo "Current Version: $CURRENT_VERSION"
-          echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "Current Stable: $CURRENT_VERSION"
           echo ""
           echo "✅ API Gateway stage removed"
           echo "✅ Lambda aliases cleaned up"
-          echo "✅ Version policy updated"
+          echo "✅ GitHub Release metadata updated"
           echo "✅ Documentation archived"
           echo ""
           echo "⚠️  Version $VERSION is no longer accessible"
-          echo ""
-          echo "📢 Post-Sunset Actions:"
-          echo "   1. Notify API consumers"
-          echo "   2. Update external documentation"
-          echo "   3. Monitor for any remaining usage attempts"
-          echo "   4. Review and update monitoring dashboards"
           echo ""

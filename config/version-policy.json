@@ -1,37 +1,4 @@
 {
-  "currentVersion": "v1",
-  "supportedVersions": [
-    "v1",
-    "v2"
-  ],
-  "versions": {
-    "v1": {
-      "status": "stable",
-      "sunsetDate": null,
-      "migrationGuide": null,
-      "lambdaAlias": "v1",
-      "description": "Initial stable version",
-      "releaseDate": "2026-02-18T00:00:00Z",
-      "lastDeployed": null,
-      "breakingChanges": []
-    },
-    "v2": {
-      "status": "planned",
-      "sunsetDate": null,
-      "migrationGuide": "https://docs.iqq.com/api/migration/v1-to-v2",
-      "lambdaAlias": "v2",
-      "description": "Next version with enhanced features",
-      "releaseDate": null,
-      "lastDeployed": null,
-      "breakingChanges": []
-    },
-    "v4": {
-      "status": "planned",
-      "sunsetDate": null,
-      "migrationGuide": "https://docs.iqq.com/api/migration/v1-to-v4",
-      "lastDeployed": "2026-02-19T15:05:07Z"
-    }
-  },
   "deprecationPolicy": {
     "warningPeriodDays": 90,
     "sunsetPeriodDays": 180,
@@ -60,8 +27,9 @@
     "apiGatewayId": "r8ukhidr1m"
   },
   "metadata": {
-    "lastUpdated": "2026-02-18T00:00:00Z",
+    "lastUpdated": "2026-02-19T00:00:00Z",
     "updatedBy": "system",
-    "schemaVersion": "1.0.0"
+    "schemaVersion": "2.0.0",
+    "note": "Version tracking moved to GitHub Releases (tags: api-v1, api-v2, etc.)"
   }
 }
