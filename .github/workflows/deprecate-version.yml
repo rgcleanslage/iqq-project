@@ -137,8 +137,8 @@ jobs:
 
           echo "✅ Release api-${VERSION} updated to deprecated"
 
-  deploy-updated-config:
-    name: Redeploy Services with Deprecation Headers
+  update-lambda-config:
+    name: Update Lambda Environment Variables
     needs: [validate-deprecation, update-release-metadata]
     runs-on: ubuntu-latest
     strategy:
@@ -146,35 +146,72 @@ jobs:
         service: [package, lender, product, document]
       fail-fast: false
     steps:
-      - name: Trigger service deployment
-        uses: actions/github-script@v7
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          github-token: ${{ secrets.PAT_TOKEN }}
-          script: |
-            const service = '${{ matrix.service }}';
-            const version = '${{ github.event.inputs.version }}';
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-            try {
-              await github.rest.actions.createWorkflowDispatch({
-                owner: context.repo.owner,
-                repo: `iqq-${service}-service`,
-                workflow_id: 'deploy.yml',
-                ref: 'main',
-                inputs: {
-                  version: version,
-                  environment: 'dev',
-                  triggered_by: 'deprecation-workflow'
-                }
-              });
-              console.log(`✅ Deployment triggered for iqq-${service}-service`);
-            } catch (error) {
-              console.error(`❌ Failed to trigger deployment: ${error.message}`);
-              throw error;
-            }
+      - name: Update Lambda environment variables
+        run: |
+          SERVICE="${{ matrix.service }}"
+          VERSION="${{ github.event.inputs.version }}"
+          SUNSET_TIMESTAMP="${{ needs.validate-deprecation.outputs.sunset-timestamp }}"
+          MIGRATION_URL="${{ github.event.inputs.migration_guide_url }}"
+          CURRENT_VERSION="${{ needs.validate-deprecation.outputs.current-version }}"
+          
+          FUNCTION_NAME="iqq-${SERVICE}-service-dev"
+          ALIAS_NAME="${VERSION}"
+          
+          echo "📝 Updating environment variables for ${FUNCTION_NAME}:${ALIAS_NAME}..."
+          
+          # Get the function version that the alias points to
+          FUNCTION_VERSION=$(aws lambda get-alias \
+            --function-name "$FUNCTION_NAME" \
+            --name "$ALIAS_NAME" \
+            --query 'FunctionVersion' \
+            --output text 2>/dev/null)
+          
+          if [ -z "$FUNCTION_VERSION" ] || [ "$FUNCTION_VERSION" == "None" ]; then
+            echo "⚠️  Alias ${ALIAS_NAME} not found for ${FUNCTION_NAME}, skipping"
+            exit 0
+          fi
+          
+          echo "Found function version: $FUNCTION_VERSION"
+          
+          # Get current environment variables
+          CURRENT_ENV=$(aws lambda get-function-configuration \
+            --function-name "${FUNCTION_NAME}:${FUNCTION_VERSION}" \
+            --query 'Environment.Variables' \
+            --output json)
+          
+          # Update with deprecation info
+          UPDATED_ENV=$(echo "$CURRENT_ENV" | jq \
+            --arg status "deprecated" \
+            --arg sunset "$SUNSET_TIMESTAMP" \
+            --arg guide "$MIGRATION_URL" \
+            --arg current "$CURRENT_VERSION" \
+            '. + {
+              VERSION_STATUS: $status,
+              VERSION_SUNSET_DATE: $sunset,
+              VERSION_MIGRATION_GUIDE: $guide,
+              VERSION_CURRENT: $current
+            }')
+          
+          # Update the function configuration
+          aws lambda update-function-configuration \
+            --function-name "${FUNCTION_NAME}:${FUNCTION_VERSION}" \
+            --environment "Variables=${UPDATED_ENV}" \
+            > /dev/null
+          
+          echo "✅ Updated environment variables for ${FUNCTION_NAME}:${ALIAS_NAME}"
+          echo "   VERSION_STATUS=deprecated"
+          echo "   VERSION_SUNSET_DATE=${SUNSET_TIMESTAMP}"
+          echo "   VERSION_MIGRATION_GUIDE=${MIGRATION_URL}"
 
   verify-deprecation-headers:
     name: Verify Deprecation Headers
-    needs: deploy-updated-config
+    needs: update-lambda-config
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS credentials
@@ -183,8 +220,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Wait for deployments
-        run: sleep 60
+      - name: Wait for Lambda configuration to propagate
+        run: |
+          echo "⏳ Waiting 10 seconds for Lambda configuration to propagate..."
+          sleep 10
 
       - name: Get OAuth token
         id: auth
@@ -278,7 +317,7 @@ jobs:
           echo "Migration Guide: ${{ github.event.inputs.migration_guide_url }}"
           echo ""
           echo "✅ GitHub Release metadata updated"
-          echo "✅ All services updated with deprecation headers"
+          echo "✅ All Lambda environment variables updated"
           echo "✅ Deprecation headers verified"
           echo ""
           echo "📢 Next Steps:"
