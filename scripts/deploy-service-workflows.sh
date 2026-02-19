@@ -1,111 +1,102 @@
 #!/bin/bash
 
 # Script to deploy service deployment workflows to all service repositories
-# This copies the template workflow to each service repository
+# Usage: ./scripts/deploy-service-workflows.sh
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATE_FILE="$SCRIPT_DIR/service-deploy-workflow.yml"
-
-# Services to update
-SERVICES=("package" "lender" "product" "document")
-
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📦 Deploying Service Workflows"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🚀 Deploying service deployment workflows"
 echo ""
 
-# Check if template exists
-if [ ! -f "$TEMPLATE_FILE" ]; then
-    echo "❌ Template file not found: $TEMPLATE_FILE"
-    exit 1
-fi
+# Define services
+SERVICES=(
+  "package"
+  "lender"
+  "product"
+  "document"
+)
 
-echo "✅ Template file found: $TEMPLATE_FILE"
-echo ""
+# Track success/failure
+SUCCESS_COUNT=0
+FAILED_REPOS=()
 
-for SERVICE in "${SERVICES[@]}"; do
-    SERVICE_DIR="$ROOT_DIR/../iqq-${SERVICE}-service"
-    WORKFLOW_DIR="$SERVICE_DIR/.github/workflows"
-    WORKFLOW_FILE="$WORKFLOW_DIR/deploy.yml"
-    
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Processing: iqq-${SERVICE}-service"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    
-    # Check if service directory exists
-    if [ ! -d "$SERVICE_DIR" ]; then
-        echo "⚠️  Service directory not found: $SERVICE_DIR"
-        echo "   Skipping..."
-        echo ""
-        continue
-    fi
-    
-    echo "✅ Service directory found"
-    
-    # Create .github/workflows directory if it doesn't exist
-    if [ ! -d "$WORKFLOW_DIR" ]; then
-        echo "📁 Creating workflow directory..."
-        mkdir -p "$WORKFLOW_DIR"
-    fi
-    
-    # Copy and customize template
-    echo "📝 Creating deployment workflow..."
-    sed "s/{SERVICE_NAME}/${SERVICE}/g" "$TEMPLATE_FILE" > "$WORKFLOW_FILE"
-    
-    echo "✅ Workflow created: $WORKFLOW_FILE"
-    
-    # Check if we're in a git repository
-    if [ -d "$SERVICE_DIR/.git" ]; then
-        cd "$SERVICE_DIR"
-        
-        # Check if there are changes
-        if git diff --quiet .github/workflows/deploy.yml 2>/dev/null; then
-            echo "ℹ️  No changes to commit"
-        else
-            echo "📤 Committing workflow..."
-            git add .github/workflows/deploy.yml
-            git commit -m "ci: add version deployment workflow
+# Function to deploy workflow to a service
+deploy_workflow() {
+  local service=$1
+  local repo="iqq-${service}-service"
+  
+  echo "📦 Processing: $repo"
+  
+  # Check if directory exists
+  if [ ! -d "$repo" ]; then
+    echo "   ⚠️  Directory not found: $repo (skipping)"
+    FAILED_REPOS+=("$repo (not found)")
+    return 1
+  fi
+  
+  cd "$repo"
+  
+  # Create .github/workflows directory if it doesn't exist
+  mkdir -p .github/workflows
+  
+  # Copy and customize workflow template
+  echo "   📝 Creating deploy.yml workflow..."
+  sed "s/{SERVICE_NAME}/${service}/g" ../scripts/service-deploy-workflow.yml > .github/workflows/deploy.yml
+  
+  # Check if on main branch
+  CURRENT_BRANCH=$(git branch --show-current)
+  if [ "$CURRENT_BRANCH" != "main" ]; then
+    echo "   ⚠️  Not on main branch (currently on $CURRENT_BRANCH), switching..."
+    git checkout main
+  fi
+  
+  # Add and commit
+  git add .github/workflows/deploy.yml
+  
+  if git diff --cached --quiet; then
+    echo "   ℹ️  No changes to commit (workflow already exists)"
+  else
+    git commit -m "feat: add service deployment workflow
 
-- Add workflow_dispatch deployment workflow
-- Support v1 and v2 version deployments
-- Integrate with centralized orchestration
-- Auto-update Lambda aliases"
-            
-            echo "✅ Changes committed"
-            echo ""
-            echo "📌 To push changes, run:"
-            echo "   cd $SERVICE_DIR && git push origin main"
-        fi
-        
-        cd "$ROOT_DIR"
-    else
-        echo "⚠️  Not a git repository, skipping commit"
-    fi
+- Add GitHub Actions workflow for version-based deployment
+- Support v1 and v2 version deployment
+- Includes build, test, deploy, and alias update steps
+- Automated by deploy-service-workflows.sh script"
     
-    echo ""
+    echo "   📤 Pushing to remote..."
+    git push origin main
+    
+    echo "   ✅ Workflow deployed to $repo"
+  fi
+  
+  SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+  
+  cd ..
+  echo ""
+}
+
+# Deploy workflows to all services
+for service in "${SERVICES[@]}"; do
+  deploy_workflow "$service"
 done
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ Workflow Deployment Complete"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Summary
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📊 Summary:"
+echo "   ✅ Successfully processed: $SUCCESS_COUNT services"
+
+if [ ${#FAILED_REPOS[@]} -gt 0 ]; then
+  echo "   ❌ Failed/Skipped: ${#FAILED_REPOS[@]} services"
+  for repo in "${FAILED_REPOS[@]}"; do
+    echo "      - $repo"
+  done
+fi
+
 echo ""
-echo "📋 Summary:"
-echo "   - Template: $TEMPLATE_FILE"
-echo "   - Services: ${SERVICES[*]}"
+echo "🎉 Service workflow deployment complete!"
 echo ""
-echo "📌 Next Steps:"
-echo "   1. Review the generated workflows in each service repository"
-echo "   2. Push changes to each service repository"
-echo "   3. Ensure GitHub secrets are configured:"
-echo "      - AWS_ROLE_ARN"
-echo "      - SAM_DEPLOYMENT_BUCKET"
-echo "   4. Test workflows with manual dispatch"
-echo ""
-echo "🚀 To push all changes at once:"
-echo "   for service in ${SERVICES[*]}; do"
-echo "     cd ../iqq-\${service}-service && git push origin main"
-echo "   done"
+echo "📝 Next steps:"
+echo "   1. Verify workflows in each service repository"
+echo "   2. Use 'Deploy API Version' workflow to deploy services"
+echo "   3. Or manually trigger deploy.yml in each service"
 echo ""
