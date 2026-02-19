@@ -350,9 +350,9 @@ jobs:
           FOOTER
           
           # Replace variables
-          sed -i '' "s/\${FROM_VERSION}/${FROM_VERSION}/g" docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
-          sed -i '' "s/\${TO_VERSION}/${TO_VERSION}/g" docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
-          sed -i '' "s/\${DATE}/${DATE}/g" docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+          sed -i "s/\${FROM_VERSION}/${FROM_VERSION}/g" docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+          sed -i "s/\${TO_VERSION}/${TO_VERSION}/g" docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
+          sed -i "s/\${DATE}/${DATE}/g" docs/api/migrations/MIGRATION_${FROM_VERSION}_TO_${TO_VERSION}.md
           
           echo "✅ Migration guide generated"
       
