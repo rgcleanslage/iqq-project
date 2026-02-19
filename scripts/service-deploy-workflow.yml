@@ -65,9 +65,9 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           
-          # Check if version exists in config
-          if ! jq -e ".versions[\"$VERSION\"]" src/config/version-policy.json > /dev/null; then
-            echo "❌ Version $VERSION not found in version policy"
+          # Validate version format
+          if ! [[ "$VERSION" =~ ^v[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
             exit 1
           fi
           
