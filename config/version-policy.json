@@ -1,6 +1,9 @@
 {
   "currentVersion": "v1",
-  "supportedVersions": ["v1", "v2"],
+  "supportedVersions": [
+    "v1",
+    "v2"
+  ],
   "versions": {
     "v1": {
       "status": "stable",
@@ -21,6 +24,11 @@
       "releaseDate": null,
       "lastDeployed": null,
       "breakingChanges": []
+    },
+    "v3": {
+      "status": "planned",
+      "sunsetDate": null,
+      "migrationGuide": "https://docs.iqq.com/api/migration/v1-to-v3"
     }
   },
   "deprecationPolicy": {
