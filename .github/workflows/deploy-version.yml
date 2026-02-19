@@ -12,10 +12,22 @@ on:
           - v4
           - v2
       services:
-        description: 'Services to deploy (comma-separated or "all")'
+        description: 'Services to deploy'
         required: true
+        type: choice
+        options:
+          - all
+          - package
+          - lender
+          - product
+          - document
+          - package,lender
+          - package,product
+          - package,document
+          - lender,product
+          - lender,document
+          - product,document
         default: 'all'
-        type: string
       environment:
         description: 'Target environment'
         required: true
