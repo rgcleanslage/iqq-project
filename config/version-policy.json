@@ -28,7 +28,8 @@
     "v4": {
       "status": "planned",
       "sunsetDate": null,
-      "migrationGuide": "https://docs.iqq.com/api/migration/v1-to-v4"
+      "migrationGuide": "https://docs.iqq.com/api/migration/v1-to-v4",
+      "lastDeployed": "2026-02-19T15:05:07Z"
     }
   },
   "deprecationPolicy": {
