@@ -72,7 +72,7 @@ Quick reference guide with:
 
 ```bash
 # Set your client secret
-export IQQ_CLIENT_SECRET="oilctiluurgblk7212h8jb9lntjoefqb6n56rer3iuks9642el9"
+export IQQ_CLIENT_SECRET="YOUR_CLIENT_SECRET"
 
 # Run test script
 ./scripts/test-api-complete.sh

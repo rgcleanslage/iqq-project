@@ -10,7 +10,7 @@ Successfully created separate Cognito app clients for each API key, providing be
 #### Default Client
 - **Client ID**: `24j8eld9b4h7h0mnsa0b75t8ba`
 - **Client Name**: `iqq-default-client-dev`
-- **API Key**: `Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH`
+- **API Key**: `YOUR_API_KEY`
 - **Usage Plan**: Standard (1000 req/day, 10 req/sec)
 - **Use Case**: Internal testing, default access
 
@@ -29,7 +29,7 @@ Successfully created separate Cognito app clients for each API key, providing be
 - **Use Case**: Standard partner
 
 #### Legacy Client (Backward Compatibility)
-- **Client ID**: `25oa5u3vup2jmhl270e7shudkl`
+- **Client ID**: `YOUR_CLIENT_ID`
 - **Client Name**: `iqq-app-client-dev`
 - **Use Case**: Backward compatibility only
 

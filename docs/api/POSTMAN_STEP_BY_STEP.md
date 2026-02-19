@@ -30,9 +30,9 @@ This error means Postman is sending the wrong type of Authorization header. Here
 3. Click the eye icon (👁️) next to the environment name
 4. Click **Edit**
 5. Update these values:
-   - `clientId`: `25oa5u3vup2jmhl270e7shudkl` (should already be set)
+   - `clientId`: `YOUR_CLIENT_ID` (should already be set)
    - `clientSecret`: **YOUR_ACTUAL_SECRET** (replace this!)
-   - `apiKey`: `Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH` (should already be set)
+   - `apiKey`: `YOUR_API_KEY` (should already be set)
 6. Click **Save**
 
 ### Step 4: Get OAuth Token
@@ -80,7 +80,7 @@ After sending the OAuth token request, check the Postman Console (View → Show 
 You should see:
 ```
 ✓ Credentials encoded
-Client ID: 25oa5u3vup2jmhl270e7shudkl
+Client ID: YOUR_CLIENT_ID
 Base64 (first 30 chars): MjVvYTV1M3Z1cDJqbWhsMjcwZTdzaH...
 ✓ Authorization header set
 ✓ SUCCESS: Token obtained and saved
@@ -105,7 +105,7 @@ Try the Package endpoint - it should return 200 with quote data.
 ```bash
 aws cognito-idp describe-user-pool-client \
   --user-pool-id us-east-1_Wau5rEb2N \
-  --client-id 25oa5u3vup2jmhl270e7shudkl \
+  --client-id YOUR_CLIENT_ID \
   --region us-east-1 \
   --query 'UserPoolClient.ClientSecret' \
   --output text
@@ -131,7 +131,7 @@ CLIENT_SECRET="your-secret-here"
 # Get token
 TOKEN=$(curl -s -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "25oa5u3vup2jmhl270e7shudkl:${CLIENT_SECRET}" \
+  -u "YOUR_CLIENT_ID:${CLIENT_SECRET}" \
   -d "grant_type=client_credentials&scope=iqq-api/read" | jq -r '.access_token')
 
 echo "Token: $TOKEN"
@@ -139,7 +139,7 @@ echo "Token: $TOKEN"
 # Test package endpoint
 curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60%20months" \
   -H "Authorization: Bearer $TOKEN" \
-  -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH" | jq .
+  -H "x-api-key: YOUR_API_KEY" | jq .
 ```
 
 ## Quick Checklist

@@ -97,7 +97,7 @@ aws cloudformation delete-stack --stack-name iqq-providers
 - Domain: iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com
 
 **App Client:**
-- ID: 25oa5u3vup2jmhl270e7shudkl
+- ID: YOUR_CLIENT_ID
 - Client credentials flow enabled
 - Scopes: api/read, api/write
 
@@ -108,7 +108,7 @@ aws cloudformation delete-stack --stack-name iqq-providers
 TOKEN=$(curl -s -X POST https://iqq-auth.auth.us-east-1.amazoncognito.com/oauth2/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials" \
-  -d "client_id=25oa5u3vup2jmhl270e7shudkl" \
+  -d "client_id=YOUR_CLIENT_ID" \
   -d "client_secret=YOUR_CLIENT_SECRET" \
   | jq -r '.access_token')
 ```
@@ -117,7 +117,7 @@ TOKEN=$(curl -s -X POST https://iqq-auth.auth.us-east-1.amazoncognito.com/oauth2
 ```bash
 curl -i -X GET https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/products \
   -H "Authorization: Bearer $TOKEN" \
-  -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+  -H "x-api-key: YOUR_API_KEY"
 ```
 
 **Expected Response:**
@@ -138,7 +138,7 @@ curl -i -X GET https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/produc
 ### Test Without OAuth Token
 ```bash
 curl -i -X GET https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/products \
-  -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+  -H "x-api-key: YOUR_API_KEY"
 ```
 
 **Expected Response:**

@@ -44,7 +44,7 @@ Successfully migrated from a custom Lambda authorizer to AWS API Gateway's nativ
 ### Default API Key
 ```
 Key ID: em0rsslt3f
-Value: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH
+Value: YOUR_API_KEY
 Usage Plan: Standard (10K requests/month, 50 req/sec)
 ```
 
@@ -67,7 +67,7 @@ Usage Plan: Standard (10K requests/month, 50 req/sec)
 TOKEN=$(curl -X POST https://iqq-auth.auth.us-east-1.amazoncognito.com/oauth2/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials" \
-  -d "client_id=25oa5u3vup2jmhl270e7shudkl" \
+  -d "client_id=YOUR_CLIENT_ID" \
   -d "client_secret=YOUR_CLIENT_SECRET" \
   | jq -r '.access_token')
 ```
@@ -76,7 +76,7 @@ TOKEN=$(curl -X POST https://iqq-auth.auth.us-east-1.amazoncognito.com/oauth2/to
 ```bash
 curl -X GET https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/products \
   -H "Authorization: Bearer $TOKEN" \
-  -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+  -H "x-api-key: YOUR_API_KEY"
 ```
 
 ## What's Next

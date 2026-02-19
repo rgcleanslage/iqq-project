@@ -34,7 +34,7 @@ docker run -p 8080:8080 -e SWAGGER_JSON=/api/openapi-complete.yaml \
 
 ```bash
 # Set your credentials
-CLIENT_ID="25oa5u3vup2jmhl270e7shudkl"
+CLIENT_ID="YOUR_CLIENT_ID"
 CLIENT_SECRET="your-client-secret"
 COGNITO_DOMAIN="iqq-dev-ib9i1hvt"
 
@@ -58,7 +58,7 @@ Response:
 
 ```bash
 TOKEN="your-access-token"
-API_KEY="Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+API_KEY="YOUR_API_KEY"
 
 # Call any endpoint
 curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60%20months" \
@@ -205,9 +205,9 @@ npx @openapitools/openapi-generator-cli generate \
 2. Add variables:
    - `baseUrl`: `https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev`
    - `cognitoUrl`: `https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com`
-   - `clientId`: `25oa5u3vup2jmhl270e7shudkl`
+   - `clientId`: `YOUR_CLIENT_ID`
    - `clientSecret`: `your-client-secret`
-   - `apiKey`: `Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH`
+   - `apiKey`: `YOUR_API_KEY`
    - `accessToken`: (will be set by pre-request script)
 
 ### Add Pre-Request Script
@@ -262,11 +262,11 @@ if (!tokenExpiry || now >= tokenExpiry) {
 #!/bin/bash
 
 # Configuration
-CLIENT_ID="25oa5u3vup2jmhl270e7shudkl"
+CLIENT_ID="YOUR_CLIENT_ID"
 CLIENT_SECRET="your-client-secret"
 COGNITO_DOMAIN="iqq-dev-ib9i1hvt"
 API_BASE_URL="https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev"
-API_KEY="Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+API_KEY="YOUR_API_KEY"
 
 # Get OAuth token
 echo "Getting OAuth token..."

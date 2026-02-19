@@ -29,7 +29,7 @@ You need to Base64 encode your `clientId:clientSecret`.
 #### Option A: Using Command Line
 ```bash
 # Replace with your actual credentials
-CLIENT_ID="25oa5u3vup2jmhl270e7shudkl"
+CLIENT_ID="YOUR_CLIENT_ID"
 CLIENT_SECRET="your-secret-here"
 
 # Mac/Linux
@@ -50,7 +50,7 @@ echo -n "${CLIENT_ID}:${CLIENT_SECRET}" | base64
 2. Go to any request
 3. In Pre-request Script tab, paste:
 ```javascript
-const clientId = "25oa5u3vup2jmhl270e7shudkl";
+const clientId = "YOUR_CLIENT_ID";
 const clientSecret = "your-secret-here";
 const credentials = clientId + ':' + clientSecret;
 const base64Credentials = btoa(credentials);
@@ -79,7 +79,7 @@ console.log('Base64 Credentials:', base64Credentials);
 If Postman continues to have issues, use cURL:
 
 ```bash
-CLIENT_ID="25oa5u3vup2jmhl270e7shudkl"
+CLIENT_ID="YOUR_CLIENT_ID"
 CLIENT_SECRET="your-secret-here"
 COGNITO_DOMAIN="iqq-dev-ib9i1hvt"
 
@@ -100,7 +100,7 @@ Then copy the `access_token` from the response and manually set it in Postman en
 **Fix**:
 1. Verify your credentials in AWS Console
 2. Go to Cognito → User Pools → us-east-1_Wau5rEb2N → App clients
-3. Check Client ID matches: `25oa5u3vup2jmhl270e7shudkl`
+3. Check Client ID matches: `YOUR_CLIENT_ID`
 4. Regenerate Client Secret if needed
 
 ### Issue: "Invalid scope" Error
@@ -124,7 +124,7 @@ Run this AWS CLI command to enable OAuth flows:
 ```bash
 aws cognito-idp update-user-pool-client \
   --user-pool-id us-east-1_Wau5rEb2N \
-  --client-id 25oa5u3vup2jmhl270e7shudkl \
+  --client-id YOUR_CLIENT_ID \
   --allowed-o-auth-flows client_credentials \
   --allowed-o-auth-scopes iqq-api/read \
   --allowed-o-auth-flows-user-pool-client \
@@ -222,7 +222,7 @@ Instead of manually calling the token endpoint, you can use Postman's OAuth 2.0 
 3. Configure:
    - Grant Type: Client Credentials
    - Access Token URL: `https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token`
-   - Client ID: `25oa5u3vup2jmhl270e7shudkl`
+   - Client ID: `YOUR_CLIENT_ID`
    - Client Secret: `your-secret`
    - Scope: `iqq-api/read`
    - Client Authentication: Send as Basic Auth header

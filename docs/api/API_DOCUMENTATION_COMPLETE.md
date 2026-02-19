@@ -103,13 +103,13 @@ Complete OpenAPI 3.0.3 specification with:
 # Get token
 TOKEN=$(curl -s -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "25oa5u3vup2jmhl270e7shudkl:YOUR_SECRET" \
+  -u "YOUR_CLIENT_ID:YOUR_SECRET" \
   -d "grant_type=client_credentials&scope=iqq-api/read" | jq -r '.access_token')
 
 # Call API
 curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60%20months" \
   -H "Authorization: Bearer $TOKEN" \
-  -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+  -H "x-api-key: YOUR_API_KEY"
 ```
 
 ### Option 3: Test Script
@@ -258,9 +258,9 @@ scripts/
 ## Credentials
 
 ### Development Environment
-- **Client ID**: `25oa5u3vup2jmhl270e7shudkl`
+- **Client ID**: `YOUR_CLIENT_ID`
 - **Client Secret**: (stored securely, not in docs)
-- **API Key**: `Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH`
+- **API Key**: `YOUR_API_KEY`
 - **Cognito Domain**: `iqq-dev-ib9i1hvt`
 - **API Base URL**: `https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev`
 

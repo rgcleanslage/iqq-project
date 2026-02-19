@@ -9,7 +9,7 @@ Getting HTML error page instead of JSON when calling OAuth token endpoint.
 
 1. In Postman, use the **"Get OAuth Token (Alternative)"** request
 2. Make sure your environment has:
-   - `clientId`: `25oa5u3vup2jmhl270e7shudkl`
+   - `clientId`: `YOUR_CLIENT_ID`
    - `clientSecret`: Your actual secret
 3. Click **Send**
 4. Done! The pre-request script handles encoding automatically
@@ -20,7 +20,7 @@ Getting HTML error page instead of JSON when calling OAuth token endpoint.
    - Open `docs/api/credential-encoder.html` in your browser
    - Or use command line:
    ```bash
-   echo -n "25oa5u3vup2jmhl270e7shudkl:YOUR_SECRET" | base64
+   echo -n "YOUR_CLIENT_ID:YOUR_SECRET" | base64
    ```
 
 2. **Add to Postman environment**:
@@ -37,7 +37,7 @@ CLIENT_SECRET="your-secret-here"
 
 curl -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "25oa5u3vup2jmhl270e7shudkl:${CLIENT_SECRET}" \
+  -u "YOUR_CLIENT_ID:${CLIENT_SECRET}" \
   -d "grant_type=client_credentials&scope=iqq-api/read"
 ```
 

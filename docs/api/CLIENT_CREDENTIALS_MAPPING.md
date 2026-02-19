@@ -10,7 +10,7 @@ Each API key is now tagged with a `clientId` that automatically maps to client p
 
 **API Key**:
 - Key ID: `em0rsslt3f`
-- Key Value: `Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH`
+- Key Value: `YOUR_API_KEY`
 - Tagged with: `clientId=CLI001`
 
 **OAuth Credentials**:
@@ -70,8 +70,8 @@ Each API key is now tagged with a `clientId` that automatically maps to client p
 **Use Case**: Backward compatibility only
 
 **OAuth Credentials**:
-- Client ID: `25oa5u3vup2jmhl270e7shudkl`
-- Client Secret: `oilctiluurgblk7212h8jb9lntjoefqb6n56rer3iuks9642el9`
+- Client ID: `YOUR_CLIENT_ID`
+- Client Secret: `YOUR_CLIENT_SECRET`
 - Client Name: `iqq-app-client-dev`
 
 **Note**: This client can be used with any API key but is maintained for backward compatibility. New integrations should use partner-specific clients.
@@ -208,7 +208,7 @@ terraform output -raw partner_b_api_key_value
 ```bash
 CLIENT_ID="24j8eld9b4h7h0mnsa0b75t8ba"
 CLIENT_SECRET="k8e02n7a4p6vlc0vm8gtdmgp17b0i2suelpn8vrmnkhubglmhji"
-API_KEY="Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+API_KEY="YOUR_API_KEY"
 
 # Get OAuth token
 TOKEN=$(curl -s -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
@@ -285,7 +285,7 @@ curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/package"
 {
   "clientId": "6rvvvqvvvvvvvvvvvvvvvvvvvv",
   "clientSecret": "k8e02n7a4p6vlc0vm8gtdmgp17b0i2suelpn8vrmnkhubglmhji",
-  "apiKey": "Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+  "apiKey": "YOUR_API_KEY"
 }
 ```
 

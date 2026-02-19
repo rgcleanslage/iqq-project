@@ -47,14 +47,14 @@ Successfully migrated from COGNITO_USER_POOLS authorizer to custom TOKEN authori
 ```bash
 curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/lender" \
   -H "Authorization: Bearer <token>" \
-  -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+  -H "x-api-key: YOUR_API_KEY"
 ```
 **Result**: ✅ Authorization successful, request reaches Lambda function
 
 ### Test 2: Without OAuth Token (Only API Key)
 ```bash
 curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/lender" \
-  -H "x-api-key: Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH"
+  -H "x-api-key: YOUR_API_KEY"
 ```
 **Result**: ✅ 401 Unauthorized (custom authorizer denies)
 
@@ -110,8 +110,8 @@ API Gateway
 Authorizer logs show successful token verification:
 ```
 TOKEN Authorizer invoked { methodArn: '...', type: 'TOKEN' }
-Token verified { clientId: '25oa5u3vup2jmhl270e7shudkl', scope: 'iqq-api/read', tokenUse: 'access' }
-Authorization successful { principalId: '25oa5u3vup2jmhl270e7shudkl' }
+Token verified { clientId: 'YOUR_CLIENT_ID', scope: 'iqq-api/read', tokenUse: 'access' }
+Authorization successful { principalId: 'YOUR_CLIENT_ID' }
 ```
 
 ## Next Steps

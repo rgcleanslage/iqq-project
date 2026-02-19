@@ -14,8 +14,8 @@ This guide shows you how to test the iQQ Insurance Quoting Platform API using So
 2. **API Configuration**
    - API Gateway URL: `https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev`
    - Cognito Token URL: `https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token`
-   - Client ID: `25oa5u3vup2jmhl270e7shudkl`
-   - Client Secret: `oilctiluurgblk7212h8jb9lntjoefqb6n56rer3iuks9642el9`
+   - Client ID: `YOUR_CLIENT_ID`
+   - Client Secret: `YOUR_CLIENT_SECRET`
    - Scopes: `iqq-api/read iqq-api/write`
 
 ---
@@ -41,8 +41,8 @@ This guide shows you how to test the iQQ Insurance Quoting Platform API using So
 4. Configure OAuth 2.0 settings:
    - **Grant Type**: `Client Credentials`
    - **Access Token URI**: `https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token`
-   - **Client ID**: `25oa5u3vup2jmhl270e7shudkl`
-   - **Client Secret**: `oilctiluurgblk7212h8jb9lntjoefqb6n56rer3iuks9642el9`
+   - **Client ID**: `YOUR_CLIENT_ID`
+   - **Client Secret**: `YOUR_CLIENT_SECRET`
    - **Scope**: `iqq-api/read iqq-api/write`
    - **Client Authentication**: `Send as Basic Auth Header`
 5. Click **Get Access Token**
@@ -56,7 +56,7 @@ Since SoapUI Open Source has limited OAuth 2.0 support, you'll need to get the t
 ```bash
 curl -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "25oa5u3vup2jmhl270e7shudkl:oilctiluurgblk7212h8jb9lntjoefqb6n56rer3iuks9642el9" \
+  -u "YOUR_CLIENT_ID:YOUR_CLIENT_SECRET" \
   -d "grant_type=client_credentials&scope=iqq-api/read iqq-api/write"
 ```
 
@@ -465,7 +465,7 @@ Watch for:
 ```bash
 curl -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "25oa5u3vup2jmhl270e7shudkl:oilctiluurgblk7212h8jb9lntjoefqb6n56rer3iuks9642el9" \
+  -u "YOUR_CLIENT_ID:YOUR_CLIENT_SECRET" \
   -d "grant_type=client_credentials&scope=iqq-api/read iqq-api/write"
 ```
 

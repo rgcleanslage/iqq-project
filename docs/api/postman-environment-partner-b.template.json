@@ -1,0 +1,60 @@
+{
+  "id": "iqq-partner-b-client",
+  "name": "iQQ Partner B Client (CLI003)",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "cognitoUrl",
+      "value": "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "clientId",
+      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "type": "default",
+      "enabled": true,
+      "description": "Partner B Client - Maps to CLI003. Get from: terraform output -json cognito_partner_clients | jq -r '.partner_b.client_id'"
+    },
+    {
+      "key": "clientSecret",
+      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "type": "secret",
+      "enabled": true,
+      "description": "Get from: terraform output -json cognito_partner_client_secrets | jq -r '.partner_b'"
+    },
+    {
+      "key": "apiKey",
+      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "type": "default",
+      "enabled": true,
+      "description": "Partner B API Key - Tagged with clientId=CLI003. Get from: terraform output -raw partner_b_api_key_value"
+    },
+    {
+      "key": "businessClientId",
+      "value": "CLI003",
+      "type": "default",
+      "enabled": true,
+      "description": "Business Client ID (automatically extracted from API key)"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "tokenExpiry",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "description": "Partner B client environment with CLI003 preferences:\n- No preferences configured\n- Expected result: All 3 quotes (APCO, Client Direct, Route66)\n\nIMPORTANT: This is a template file. Copy to postman-environment-partner-b.json and fill in the credentials."
+}

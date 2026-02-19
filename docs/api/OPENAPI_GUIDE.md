@@ -196,7 +196,7 @@ prism mock openapi.yaml
 ```bash
 curl -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "25oa5u3vup2jmhl270e7shudkl:oilctiluurgblk7212h8jb9lntjoefqb6n56rer3iuks9642el9" \
+  -u "YOUR_CLIENT_ID:YOUR_CLIENT_SECRET" \
   -d "grant_type=client_credentials&scope=iqq-api/read iqq-api/write"
 ```
 

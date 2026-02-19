@@ -1,0 +1,60 @@
+{
+  "id": "iqq-default-client",
+  "name": "iQQ Default Client (CLI001)",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "cognitoUrl",
+      "value": "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "clientId",
+      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "type": "default",
+      "enabled": true,
+      "description": "Default Client - Maps to CLI001. Get from: terraform output -json cognito_partner_clients | jq -r '.default.client_id'"
+    },
+    {
+      "key": "clientSecret",
+      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "type": "secret",
+      "enabled": true,
+      "description": "Get from: terraform output -json cognito_partner_client_secrets | jq -r '.default'"
+    },
+    {
+      "key": "apiKey",
+      "value": "GET_FROM_TERRAFORM_OR_AWS_CONSOLE",
+      "type": "default",
+      "enabled": true,
+      "description": "Default API Key - Tagged with clientId=CLI001. Get from: terraform output -raw default_api_key_value"
+    },
+    {
+      "key": "businessClientId",
+      "value": "CLI001",
+      "type": "default",
+      "enabled": true,
+      "description": "Business Client ID (automatically extracted from API key)"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "tokenExpiry",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "description": "Default client environment with CLI001 preferences:\n- Blocks APCO Insurance\n- Max 2 providers\n- Expected result: 2 quotes (Client Direct, Route66)\n\nIMPORTANT: This is a template file. Copy to postman-environment-default.json and fill in the credentials."
+}

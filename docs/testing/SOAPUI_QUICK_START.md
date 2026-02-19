@@ -81,7 +81,7 @@ Repeat Step 3 and 4 for all four services:
 |---------|-------|
 | **Base URL** | `https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev` |
 | **Token URL** | `https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token` |
-| **Client ID** | `25oa5u3vup2jmhl270e7shudkl` |
+| **Client ID** | `YOUR_CLIENT_ID` |
 | **Token Expiry** | 1 hour (3600 seconds) |
 
 ### Test Endpoints

@@ -24,7 +24,7 @@ The Postman collection has been updated to support automatic client ID mapping f
 **Credentials**:
 - Cognito Client ID: `24j8eld9b4h7h0mnsa0b75t8ba`
 - Cognito Client Secret: `k8e02n7a4p6vlc0vm8gtdmgp17b0i2suelpn8vrmnkhubglmhji`
-- API Key: `Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH`
+- API Key: `YOUR_API_KEY`
 - Business Client ID: `CLI001` (auto-extracted from API key)
 
 **Client Preferences**:

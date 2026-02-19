@@ -140,7 +140,7 @@ All tests used:
 - Cognito User Pool: `us-east-1_Wau5rEb2N`
 - Cognito Domain: `iqq-dev-ib9i1hvt`
 - Default Client ID: `24j8eld9b4h7h0mnsa0b75t8ba` (maps to CLI001)
-- API Key: `Ni69xOrTsr5iu0zpiAdkM6Yv0OGjtY3J1qfY9nPH`
+- API Key: `YOUR_API_KEY`
 
 ## Performance Observations
 

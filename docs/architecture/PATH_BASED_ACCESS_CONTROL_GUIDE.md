@@ -21,7 +21,7 @@ Edit `iqq-authorizer-service/src/index.ts` and update the `CLIENT_ACCESS_RULES` 
 ```typescript
 const CLIENT_ACCESS_RULES: Record<string, string[]> = {
   // Client 1: Can only access lender and product endpoints
-  '25oa5u3vup2jmhl270e7shudkl': ['/lender', '/product'],
+  'YOUR_CLIENT_ID': ['/lender', '/product'],
   
   // Client 2: Can only access package endpoint
   'another-client-id-here': ['/package'],

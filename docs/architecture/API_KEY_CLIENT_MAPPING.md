@@ -68,7 +68,7 @@ const COGNITO_TO_CLIENT_ID_MAP: Record<string, string> = {
   '24j8eld9b4h7h0mnsa0b75t8ba': 'CLI001', // Default client
   '518u138r9smc4iq9p6sf32e2o4': 'CLI002', // Partner A
   '4igbgdb4mmmo870serh2ehqcu5': 'CLI003', // Partner B
-  '25oa5u3vup2jmhl270e7shudkl': 'LEGACY' // Legacy client
+  'YOUR_CLIENT_ID': 'LEGACY' // Legacy client
 };
 ```
 
@@ -107,7 +107,7 @@ Policies:
 | CLI001 | 24j8eld9b4h7h0mnsa0b75t8ba | em0rsslt3f | Blocked: APCO, Max: 2 |
 | CLI002 | 518u138r9smc4iq9p6sf32e2o4 | kzsfzx6075 | Allowed: Client Direct, Route66 |
 | CLI003 | 4igbgdb4mmmo870serh2ehqcu5 | lpmo44akaj | No preferences (all providers) |
-| LEGACY | 25oa5u3vup2jmhl270e7shudkl | N/A | Backward compatibility |
+| LEGACY | YOUR_CLIENT_ID | N/A | Backward compatibility |
 
 ## Security Features
 
