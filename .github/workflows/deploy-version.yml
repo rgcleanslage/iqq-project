@@ -11,23 +11,31 @@ on:
           - v1
           - v4
           - v2
-      services:
-        description: 'Services to deploy'
-        required: true
-        type: choice
-        options:
-          - all
-          - package
-          - lender
-          - product
-          - document
-          - package,lender
-          - package,product
-          - package,document
-          - lender,product
-          - lender,document
-          - product,document
-        default: 'all'
+      deploy_all:
+        description: 'Deploy all services'
+        required: false
+        type: boolean
+        default: true
+      deploy_package:
+        description: 'Deploy package service'
+        required: false
+        type: boolean
+        default: false
+      deploy_lender:
+        description: 'Deploy lender service'
+        required: false
+        type: boolean
+        default: false
+      deploy_product:
+        description: 'Deploy product service'
+        required: false
+        type: boolean
+        default: false
+      deploy_document:
+        description: 'Deploy document service'
+        required: false
+        type: boolean
+        default: false
       environment:
         description: 'Target environment'
         required: true
@@ -77,9 +85,26 @@ jobs:
       - name: Parse services list
         id: parse
         run: |
-          SERVICES="${{ github.event.inputs.services }}"
-          if [ "$SERVICES" == "all" ]; then
+          SERVICES=""
+          
+          # Check if deploy all is selected
+          if [ "${{ github.event.inputs.deploy_all }}" == "true" ]; then
             SERVICES="package,lender,product,document"
+          else
+            # Build list from individual checkboxes
+            [ "${{ github.event.inputs.deploy_package }}" == "true" ] && SERVICES="${SERVICES}package,"
+            [ "${{ github.event.inputs.deploy_lender }}" == "true" ] && SERVICES="${SERVICES}lender,"
+            [ "${{ github.event.inputs.deploy_product }}" == "true" ] && SERVICES="${SERVICES}product,"
+            [ "${{ github.event.inputs.deploy_document }}" == "true" ] && SERVICES="${SERVICES}document,"
+            
+            # Remove trailing comma
+            SERVICES="${SERVICES%,}"
+            
+            # If no services selected, fail
+            if [ -z "$SERVICES" ]; then
+              echo "❌ No services selected for deployment"
+              exit 1
+            fi
           fi
           
           # Convert comma-separated list to JSON array (compact, no newlines)
