@@ -434,23 +434,26 @@ jobs:
           
           echo "📝 Updating workflow files to include $VERSION..."
           
-          # Update deploy-version.yml - add version to options list
+          # Update deploy-version.yml - add version to version options list only
           awk -v version="$VERSION" '
-            /options:/ { print; getline; print; print "          - " version; next }
+            /version:/ && !found_version_input { found_version_input=1; print; next }
+            found_version_input && /options:/ { print; getline; print; print "          - " version; found_version_input=0; next }
             { print }
           ' .github/workflows/deploy-version.yml > .github/workflows/deploy-version.yml.tmp
           mv .github/workflows/deploy-version.yml.tmp .github/workflows/deploy-version.yml
           
-          # Update deprecate-version.yml
+          # Update deprecate-version.yml - add version to version options list only
           awk -v version="$VERSION" '
-            /options:/ { print; getline; print; print "          - " version; next }
+            /version:/ && !found_version_input { found_version_input=1; print; next }
+            found_version_input && /options:/ { print; getline; print; print "          - " version; found_version_input=0; next }
             { print }
           ' .github/workflows/deprecate-version.yml > .github/workflows/deprecate-version.yml.tmp
           mv .github/workflows/deprecate-version.yml.tmp .github/workflows/deprecate-version.yml
           
-          # Update sunset-version.yml
+          # Update sunset-version.yml - add version to version options list only
           awk -v version="$VERSION" '
-            /options:/ { print; getline; print; print "          - " version; next }
+            /version:/ && !found_version_input { found_version_input=1; print; next }
+            found_version_input && /options:/ { print; getline; print; print "          - " version; found_version_input=0; next }
             { print }
           ' .github/workflows/sunset-version.yml > .github/workflows/sunset-version.yml.tmp
           mv .github/workflows/sunset-version.yml.tmp .github/workflows/sunset-version.yml

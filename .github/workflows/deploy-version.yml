@@ -42,7 +42,6 @@ on:
         type: choice
         options:
           - dev
-          - v4
         default: 'dev'
 
 env:
