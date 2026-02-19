@@ -9,18 +9,22 @@ Modern, serverless insurance quoting platform with provider integration, API Gat
 ✅ OAuth 2.0 with multiple Cognito clients  
 ✅ Custom TOKEN authorizer with API key validation  
 ✅ All tests passing (124 unit tests, 10 API tests)  
-✅ Security hardened (no hardcoded credentials)  
+✅ Security hardened (secrets in AWS Secrets Manager)  
 ✅ Step Functions orchestration working  
 ✅ Complete API documentation with Postman collections  
-✅ API versioning with automated workflows  
+✅ API versioning with GitHub Releases (v1-v9 deployed)  
+✅ Automated CI/CD with GitHub Actions  
 
 ## 🔄 Workflow Status
 
 [![Add New Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/add-new-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/add-new-version.yml)
 [![Deploy Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/deploy-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/deploy-version.yml)
+[![Update Version Status](https://github.com/rgcleanslage/iqq-project/actions/workflows/update-version-status.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/update-version-status.yml)
 [![Deprecate Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/deprecate-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/deprecate-version.yml)
 [![Sunset Version](https://github.com/rgcleanslage/iqq-project/actions/workflows/sunset-version.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/sunset-version.yml)
-[![Generate Migration Guide](https://github.com/rgcleanslage/iqq-project/actions/workflows/generate-migration-guide.yml/badge.svg)](https://github.com/rgcleanslage/iqq-project/actions/workflows/generate-migration-guide.yml)  
+
+**Current API Versions:** v1 (stable), v2-v9 (planned/deployed)  
+**Version Management:** GitHub Releases with automated workflows  
 
 ## 📦 GitHub Repositories
 
@@ -154,30 +158,28 @@ source .env
 - [docs/architecture/SYSTEM_ARCHITECTURE_DIAGRAM.md](docs/architecture/SYSTEM_ARCHITECTURE_DIAGRAM.md) - System architecture
 - [docs/architecture/ADAPTER_ARCHITECTURE.md](docs/architecture/ADAPTER_ARCHITECTURE.md) - Adapter design
 - [docs/architecture/PROJECT_STRUCTURE.md](docs/architecture/PROJECT_STRUCTURE.md) - Project structure
-- [docs/architecture/PATH_BASED_ACCESS_CONTROL_GUIDE.md](docs/architecture/PATH_BASED_ACCESS_CONTROL_GUIDE.md) - Access control
+- [docs/architecture/CLIENT_PREFERENCES_GUIDE.md](docs/architecture/CLIENT_PREFERENCES_GUIDE.md) - Client preferences
+- [docs/architecture/DYNAMODB_SINGLE_TABLE_DESIGN.md](docs/architecture/DYNAMODB_SINGLE_TABLE_DESIGN.md) - DynamoDB design
 
 ### Deployment
 - [docs/deployment/DEPLOYMENT_GUIDE.md](docs/deployment/DEPLOYMENT_GUIDE.md) - Comprehensive deployment guide
-- [docs/deployment/HTTP_PROVIDER_MIGRATION.md](docs/deployment/HTTP_PROVIDER_MIGRATION.md) - HTTP provider migration
-- [docs/deployment/PACKAGE_SERVICE_INTEGRATION.md](docs/deployment/PACKAGE_SERVICE_INTEGRATION.md) - Package service integration
-- [docs/deployment/STEP_FUNCTIONS_INTEGRATION_COMPLETE.md](docs/deployment/STEP_FUNCTIONS_INTEGRATION_COMPLETE.md) - Step Functions setup
+- [docs/deployment/API_VERSIONING_WITH_GITHUB_RELEASES.md](docs/deployment/API_VERSIONING_WITH_GITHUB_RELEASES.md) - API versioning guide
+- [docs/deployment/CICD_SETUP_GUIDE.md](docs/deployment/CICD_SETUP_GUIDE.md) - CI/CD setup
+- [docs/deployment/SECRETS_MANAGER_SETUP.md](docs/deployment/SECRETS_MANAGER_SETUP.md) - Secrets management
+- [docs/deployment/GITHUB_OIDC_SETUP.md](docs/deployment/GITHUB_OIDC_SETUP.md) - GitHub OIDC setup
 
 ### Testing
-- [docs/testing/HTTP_PROVIDER_TEST_RESULTS.md](docs/testing/HTTP_PROVIDER_TEST_RESULTS.md) - API test results
-- [docs/testing/COVERAGE_IMPROVEMENT_SUMMARY.md](docs/testing/COVERAGE_IMPROVEMENT_SUMMARY.md) - Test coverage report
 - [docs/testing/SOAPUI_TESTING_GUIDE.md](docs/testing/SOAPUI_TESTING_GUIDE.md) - SoapUI testing guide
-
-### Security
-- [CREDENTIALS_REMOVED.md](CREDENTIALS_REMOVED.md) - Security improvements
-- [docs/deployment/API_KEY_DEPLOYMENT_GUIDE.md](docs/deployment/API_KEY_DEPLOYMENT_GUIDE.md) - API key setup
+- [docs/testing/SOAPUI_QUICK_START.md](docs/testing/SOAPUI_QUICK_START.md) - Quick start guide
+- [docs/testing/test-all-endpoints.sh](docs/testing/test-all-endpoints.sh) - Test script
 
 ### API Documentation
 - [docs/api/README.md](docs/api/README.md) - API documentation overview
 - [docs/api/openapi-complete.yaml](docs/api/openapi-complete.yaml) - Complete OpenAPI 3.0.3 specification
 - [docs/api/OPENAPI_USAGE_GUIDE.md](docs/api/OPENAPI_USAGE_GUIDE.md) - How to use OpenAPI spec
-- [docs/api/API_DOCUMENTATION_COMPLETE.md](docs/api/API_DOCUMENTATION_COMPLETE.md) - Complete API docs
 - [docs/api/CLIENT_CREDENTIALS_MAPPING.md](docs/api/CLIENT_CREDENTIALS_MAPPING.md) - OAuth client mapping
 - [docs/api/POSTMAN_STEP_BY_STEP.md](docs/api/POSTMAN_STEP_BY_STEP.md) - Postman setup guide
+- [docs/api/API_VERSION_HEADERS.md](docs/api/API_VERSION_HEADERS.md) - Version headers documentation
 
 ## 🧪 Testing
 
@@ -342,8 +344,12 @@ aws stepfunctions describe-execution --execution-arn <arn>
 - ✅ Serverless deployment with SAM
 - ✅ TypeScript Lambda development
 - ✅ Unit testing with Jest
-- ✅ Security best practices
+- ✅ Security best practices (AWS Secrets Manager)
 - ✅ Cost optimization strategies
+- ✅ API versioning with GitHub Releases
+- ✅ Automated CI/CD with GitHub Actions
+- ✅ Lambda aliases for version routing
+- ✅ Deprecation headers and sunset dates
 
 ## 🚧 Known Limitations
 
@@ -400,6 +406,6 @@ This is a reference architecture for demonstration purposes.
 
 ---
 
-**Last Updated:** February 18, 2026  
-**Version:** 1.0.0  
-**Status:** Production Ready with OAuth 2.0 ✅
+**Last Updated:** February 19, 2026  
+**Version:** 2.0.0  
+**Status:** Production Ready with GitHub Releases Versioning ✅

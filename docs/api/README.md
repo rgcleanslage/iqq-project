@@ -1,61 +1,100 @@
 # iQQ API Documentation
 
-Complete API documentation for the iQQ Insurance Quote system.
+Complete API documentation for the iQQ Insurance Quote system with versioning support.
 
 ## Quick Links
 
 - [OpenAPI Specification](./openapi-complete.yaml) - Complete API spec with OAuth endpoint
 - [Usage Guide](./OPENAPI_USAGE_GUIDE.md) - Detailed usage instructions
-- [Postman Collection](./postman-collection.json) - Import into Postman
-- [Postman Environment](./postman-environment.json) - Environment variables for Postman
+- [Version Headers](./API_VERSION_HEADERS.md) - API versioning documentation
+- [Postman Collection](./postman-collection-fixed.json) - Import into Postman
+- [Postman Setup Guide](./POSTMAN_STEP_BY_STEP.md) - Step-by-step Postman configuration
 - [Postman Troubleshooting](./POSTMAN_TROUBLESHOOTING.md) - Fix common Postman issues
 - [Credential Encoder](./credential-encoder.html) - Web tool to encode credentials
-- [Test Script](../../scripts/test-api-complete.sh) - Automated testing script
+- [Secrets Management](./SECRETS_MANAGEMENT.md) - How secrets are managed
+
+## API Versioning
+
+The iQQ API uses GitHub Releases for version management. Each version is deployed as a separate API Gateway stage with Lambda aliases.
+
+### Available Versions
+
+- **v1** - Stable (current production version)
+- **v2-v9** - Deployed and available for testing
+
+### Version Lifecycle
+
+Versions progress through these stages:
+- **planned** - Version created but not yet deployed
+- **alpha** - Early testing phase
+- **beta** - Feature complete, testing in progress
+- **stable** - Production ready
+- **deprecated** - Still available but scheduled for removal
+- **sunset** - No longer available
+
+See [API_VERSIONING_SETUP.md](./API_VERSIONING_SETUP.md) for complete versioning documentation.
 
 ## Getting Started
 
-### 1. Quick Test with cURL
+### 1. Choose Your API Version
+
+All endpoints support versioning via the URL path:
 
 ```bash
-# Set your client secret
-export IQQ_CLIENT_SECRET="your-client-secret"
+# Use v1 (stable)
+https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/v1/package
 
-# Run the test script
-./scripts/test-api-complete.sh
+# Use v2 (testing)
+https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/v2/package
 ```
 
-### 2. Using Postman
+### 2. Get OAuth Token
 
-1. Import `postman-collection.json` into Postman
-2. Import `postman-environment.json` as environment
-3. Update `clientSecret` in environment variables
-4. Use "Get OAuth Token (Alternative)" request (auto-encodes credentials)
-5. Test other endpoints (token auto-refreshes)
+```bash
+# Get token from Cognito
+curl -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -u "YOUR_CLIENT_ID:YOUR_CLIENT_SECRET" \
+  -d "grant_type=client_credentials"
+```
+
+### 3. Make API Request
+
+```bash
+# Call API with token and API key
+curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/v1/package?productCode=MBP" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "x-api-key: $API_KEY"
+```
+
+### 4. Using Postman
+
+1. Import `postman-collection-fixed.json` into Postman
+2. Import one of the environment templates:
+   - `postman-environment-default.template.json`
+   - `postman-environment-partner-a.template.json`
+   - `postman-environment-partner-b.template.json`
+3. Update `clientSecret` and `apiKey` in environment variables
+4. Use "Get OAuth Token" request to authenticate
+5. Test endpoints (token auto-refreshes)
 
 **Having issues?** See [Postman Troubleshooting Guide](./POSTMAN_TROUBLESHOOTING.md)
 
 **Need to encode credentials?** Open `credential-encoder.html` in your browser
 
-### 3. Using Swagger UI
-
-```bash
-# Online
-# Go to https://editor.swagger.io/
-# Import openapi-complete.yaml
-
-# Local with Docker
-docker run -p 8080:8080 -e SWAGGER_JSON=/api/openapi-complete.yaml \
-  -v $(pwd)/docs/api:/api swaggerapi/swagger-ui
-
-# Open http://localhost:8080
-```
-
 ## API Overview
 
 ### Base URLs
 
-- **Dev**: `https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev`
-- **Prod**: `https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/prod`
+All API versions are available at:
+```
+https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/{version}/
+```
+
+Where `{version}` is: v1, v2, v3, v4, v5, v6, v7, v8, or v9
+
+**Current Stable Version:** v1  
+**Latest Version:** v9
 
 ### Authentication
 
@@ -94,37 +133,56 @@ Query Parameters:
 
 Example:
 ```bash
-curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60%20months" \
+curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/v1/package?productCode=MBP&coverageType=COMPREHENSIVE&vehicleValue=25000&term=60%20months" \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-api-key: $API_KEY"
 ```
 
+Response includes version metadata:
+```json
+{
+  "packageId": "PKG-1771346662785",
+  "metadata": {
+    "apiVersion": "v1",
+    "versionStatus": "stable",
+    "deprecationDate": null,
+    "sunsetDate": null
+  }
+}
+```
+
 ### Lender Service
-**GET /lender** - Get lender information
+**GET /{version}/lender** - Get lender information
+
+Query Parameters:
+- `lenderId` (optional): Lender identifier
 
 Example:
 ```bash
-curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/lender" \
+curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/v1/lender?lenderId=LENDER-001" \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-api-key: $API_KEY"
 ```
 
 ### Product Service
-**GET /product** - Get product information
+**GET /{version}/product** - Get product information
+
+Query Parameters:
+- `productId` (optional): Product identifier
 
 Example:
 ```bash
-curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/product" \
+curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/v1/product?productId=PROD-001" \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-api-key: $API_KEY"
 ```
 
 ### Document Service
-**GET /document** - Get document information
+**GET /{version}/document** - Get document information
 
 Example:
 ```bash
-curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/dev/document" \
+curl -X GET "https://r8ukhidr1m.execute-api.us-east-1.amazonaws.com/v1/document" \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-api-key: $API_KEY"
 ```
@@ -267,6 +325,15 @@ API Gateway enforces rate limits based on usage plans:
 
 ## Related Documentation
 
-- [Deployment Guide](../deployment/DEPLOYMENT_GUIDE.md)
-- [Architecture Overview](../architecture/PROJECT_STRUCTURE.md)
-- [Step Functions Integration](../deployment/STEP_FUNCTIONS_FIX_COMPLETE.md)
+- [API Versioning Guide](../../deployment/API_VERSIONING_WITH_GITHUB_RELEASES.md) - Complete versioning documentation
+- [Version Headers](./API_VERSION_HEADERS.md) - Version header documentation
+- [Deployment Guide](../deployment/DEPLOYMENT_GUIDE.md) - Deployment instructions
+- [Architecture Overview](../architecture/PROJECT_STRUCTURE.md) - System architecture
+- [Secrets Management](./SECRETS_MANAGEMENT.md) - How secrets are managed
+- [Postman Setup](./POSTMAN_STEP_BY_STEP.md) - Postman configuration guide
+
+---
+
+**Last Updated:** February 19, 2026  
+**API Version:** v1 (stable), v2-v9 (available)  
+**Status:** Production Ready ✅
