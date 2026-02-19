@@ -133,32 +133,32 @@ jobs:
     needs: [validate-sunset, check-usage]
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout infrastructure repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.GITHUB_ORG }}/iqq-infrastructure
-          token: ${{ secrets.PAT_TOKEN }}
-          path: infrastructure
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.0
-      
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       
+      - name: Get API Gateway ID
+        id: get-api
+        run: |
+          # Get API Gateway ID from existing deployment
+          API_ID=$(aws apigateway get-rest-apis \
+            --query 'items[?name==`iqq-api-dev`].id' \
+            --output text)
+          
+          if [ -z "$API_ID" ]; then
+            echo "❌ API Gateway not found"
+            exit 1
+          fi
+          
+          echo "api_id=$API_ID" >> $GITHUB_OUTPUT
+          echo "✅ API Gateway ID: $API_ID"
+      
       - name: Remove API Gateway stage
-        working-directory: infrastructure
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          
-          terraform init
-          
-          API_ID=$(terraform output -raw api_gateway_id)
+          API_ID="${{ steps.get-api.outputs.api_id }}"
           
           echo "🗑️  Removing API Gateway stage: $VERSION"
           
@@ -178,10 +178,9 @@ jobs:
           echo "✅ API Gateway stage $VERSION removed"
       
       - name: Verify stage removal
-        working-directory: infrastructure
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          API_ID=$(terraform output -raw api_gateway_id)
+          API_ID="${{ steps.get-api.outputs.api_id }}"
           
           # Verify stage is gone
           if aws apigateway get-stage \

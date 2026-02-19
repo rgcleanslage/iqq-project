@@ -242,18 +242,37 @@ jobs:
       - name: Get OAuth token
         id: auth
         run: |
-          cd iqq-infrastructure
-          CLIENT_ID=$(terraform output -json cognito_partner_clients | jq -r '.default.client_id')
-          CLIENT_SECRET=$(terraform output -json cognito_partner_client_secrets | jq -r '.default')
-          API_KEY=$(terraform output -raw default_api_key_value)
+          # Get Cognito User Pool ID
+          USER_POOL_ID=$(aws cognito-idp list-user-pools --max-results 10 \
+            --query 'UserPools[?Name==`iqq-dev-user-pool`].Id' \
+            --output text)
           
-          TOKEN=$(curl -s -X POST "https://iqq-dev-ib9i1hvt.auth.us-east-1.amazoncognito.com/oauth2/token" \
+          # Get User Pool Domain
+          DOMAIN=$(aws cognito-idp describe-user-pool --user-pool-id "$USER_POOL_ID" \
+            --query 'UserPool.Domain' --output text 2>/dev/null || echo "iqq-dev-ib9i1hvt")
+          
+          # Get client credentials from Secrets Manager
+          CLIENT_ID=$(aws secretsmanager get-secret-value \
+            --secret-id "iqq-dev-cognito-client-default" \
+            --query 'SecretString' --output text | jq -r '.client_id')
+          
+          CLIENT_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id "iqq-dev-cognito-client-default" \
+            --query 'SecretString' --output text | jq -r '.client_secret')
+          
+          # Get API Key from Secrets Manager
+          API_KEY=$(aws secretsmanager get-secret-value \
+            --secret-id "iqq-dev-api-key-default" \
+            --query 'SecretString' --output text | jq -r '.api_key')
+          
+          TOKEN=$(curl -s -X POST "https://${DOMAIN}.auth.us-east-1.amazoncognito.com/oauth2/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             -u "${CLIENT_ID}:${CLIENT_SECRET}" \
             -d "grant_type=client_credentials" | jq -r '.access_token')
           
           echo "::add-mask::$TOKEN"
           echo "::add-mask::$API_KEY"
+          echo "::add-mask::$CLIENT_SECRET"
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
           echo "api_key=$API_KEY" >> $GITHUB_OUTPUT
       
