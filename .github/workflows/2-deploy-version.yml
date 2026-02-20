@@ -1,4 +1,4 @@
-name: Deploy API Version
+name: 2. Deploy API Version
 
 on:
   workflow_dispatch:

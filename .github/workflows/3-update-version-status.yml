@@ -1,4 +1,4 @@
-name: Update Version Status
+name: 3. Update Version Status
 
 on:
   workflow_dispatch:

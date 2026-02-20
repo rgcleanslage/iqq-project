@@ -1,4 +1,4 @@
-name: Add New API Version
+name: 1. Add New API Version
 
 on:
   workflow_dispatch:

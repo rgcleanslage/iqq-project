@@ -1,4 +1,4 @@
-name: Deprecate API Version
+name: 4. Deprecate API Version
 
 on:
   workflow_dispatch:

@@ -1,4 +1,4 @@
-name: Sunset API Version
+name: 5. Sunset API Version
 
 on:
   workflow_dispatch:
