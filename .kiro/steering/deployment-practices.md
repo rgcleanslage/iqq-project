@@ -465,10 +465,180 @@ After deploying:
 - [ ] DynamoDB tables accessible
 - [ ] Step Functions executing successfully
 
+## API Versioning with GitHub Releases
+
+### Version Lifecycle
+
+All API versions are tracked through GitHub Releases on the root repository with tag format `api-{version}`:
+
+```
+planned → alpha → beta → stable → deprecated → sunset
+```
+
+**Current Version**: v9 (latest release)
+
+### Creating a New Version (v10)
+
+Use GitHub Actions workflows to manage versions:
+
+#### 1. Add New API Version
+
+**Workflow**: `.github/workflows/add-new-version.yml`
+
+```bash
+# Go to: Actions → Add New API Version → Run workflow
+Inputs:
+  new_version: v10
+  status: planned
+  migration_guide_url: (optional)
+```
+
+**What it does**:
+- Creates GitHub Release `api-v10` with metadata
+- Generates migration guide template
+- Creates API Gateway stage for v10
+- Adds Lambda permissions for all services
+- Creates `release/v10` branches in all service repos
+
+#### 2. Update Version Status
+
+**Workflow**: `.github/workflows/update-version-status.yml`
+
+```bash
+# Promote through lifecycle
+Actions → Update Version Status → Run workflow
+  version: v10
+  new_status: alpha  # or beta, stable
+  make_current: false  # true only for stable
+```
+
+#### 3. Deploy API Version
+
+**Workflow**: `.github/workflows/deploy-version.yml`
+
+```bash
+# Deploy all services for v10
+Actions → Deploy API Version → Run workflow
+  version: v10
+  deploy_all: true
+  environment: dev
+```
+
+**What it does**:
+- Triggers deployment in each service repo
+- Tests all endpoints
+- Redeploys API Gateway stage
+- Updates release metadata with deploy timestamp
+
+#### 4. Deprecate Old Version
+
+**Workflow**: `.github/workflows/deprecate-version.yml`
+
+```bash
+# Deprecate v8 with 90-day notice
+Actions → Deprecate API Version → Run workflow
+  version: v8
+  sunset_date: 2026-05-31
+  migration_guide_url: https://...
+```
+
+Adds deprecation headers to responses:
+```
+X-API-Deprecated: true
+X-API-Sunset-Date: 2026-05-31
+Warning: 299 - "API version v8 is deprecated..."
+```
+
+#### 5. Sunset Version
+
+**Workflow**: `.github/workflows/sunset-version.yml`
+
+```bash
+# Permanently remove v8
+Actions → Sunset API Version → Run workflow
+  version: v8
+  confirm: CONFIRM
+```
+
+Removes API Gateway stage and Lambda aliases.
+
+### Release Metadata Format
+
+Each release contains JSON metadata in the body:
+
+```json
+{
+  "version": "v10",
+  "status": "planned",
+  "sunsetDate": null,
+  "migrationGuide": null,
+  "lambdaAlias": "v10",
+  "releaseDate": "2026-02-23T00:00:00Z",
+  "lastDeployed": null,
+  "previousVersion": "v9"
+}
+```
+
+### CLI Commands
+
+```bash
+# List all API versions
+gh release list --repo rgcleanslage/iqq-project | grep "api-"
+
+# View version metadata
+gh release view api-v10 --repo rgcleanslage/iqq-project
+
+# Extract JSON metadata
+gh release view api-v10 --repo rgcleanslage/iqq-project --json body --jq '.body' | \
+  sed -n '/```json/,/```/p' | sed '1d;$d' | jq .
+
+# Find current stable version
+gh release list --repo rgcleanslage/iqq-project --json tagName,body --limit 100 | \
+  jq -r '[.[] | select(.tagName | startswith("api-")) | 
+    select(.body | contains("\"status\": \"stable\""))] | .[].tagName'
+```
+
+### Typical Version Creation Flow
+
+```bash
+# 1. Create v10 as planned
+#    Actions → Add New API Version → v10, planned
+
+# 2. Promote to alpha for internal testing
+#    Actions → Update Version Status → v10, alpha
+
+# 3. Deploy v10
+#    Actions → Deploy API Version → v10
+
+# 4. Test and promote to beta
+#    Actions → Update Version Status → v10, beta
+
+# 5. When ready, promote to stable
+#    Actions → Update Version Status → v10, stable, make_current: true
+
+# 6. Deprecate old version (v8)
+#    Actions → Deprecate API Version → v8, sunset_date
+
+# 7. After sunset date, remove v8
+#    Actions → Sunset API Version → v8, CONFIRM
+```
+
+### Version Environment Variables
+
+Services read version info from Lambda environment variables:
+
+- `VERSION_STATUS`: stable, deprecated, etc.
+- `VERSION_SUNSET_DATE`: ISO date or empty
+- `VERSION_MIGRATION_GUIDE`: URL or empty
+- `VERSION_CURRENT`: Current stable version
+
+These are set during deployment and used by `response-builder.ts` to add appropriate headers.
+
 ## References
 
 - #[[file:docs/deployment/DEPLOYMENT_GUIDE.md]]
 - #[[file:docs/deployment/DEVELOPMENT_WORKFLOW.md]]
+- #[[file:docs/deployment/API_VERSIONING_WITH_GITHUB_RELEASES.md]]
 - #[[file:docs/deployment/CICD_SETUP_GUIDE.md]]
 - #[[file:docs/deployment/GITHUB_OIDC_SETUP.md]]
 - #[[file:docs/deployment/MANUAL_DEPLOYMENT_GUIDE.md]]
